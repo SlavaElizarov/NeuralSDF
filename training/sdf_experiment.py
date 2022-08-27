@@ -1,16 +1,20 @@
 import pytorch_lightning as pl
+import torch
 from torch import nn
 from torch.nn import functional as F
 from torch import autograd
-
-
+from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
-import torch
+from models.siren import Siren
+
+from training.dataset import MeshDataset
 
 
 class SdfExperiment(pl.LightningModule):
     def __init__(self, 
-                 sdf_model: nn.Module, 
+                 sdf_model: Siren, 
+                 mesh_path: str,
+                 batch_size: int = 1024,
                  level_set_loss_weight: float = 10,
                  eikonal_loss_weight: float = 1,
                  grad_direction_loss_weight: float = 1,
@@ -23,6 +27,8 @@ class SdfExperiment(pl.LightningModule):
         self.eikonal_loss_weight = eikonal_loss_weight
         self.grad_direction_loss_weight = grad_direction_loss_weight
         self.enforce_eikonality = enforce_eikonality
+        self.mesh_path = mesh_path # it's a bit of an antipatern to have this here TODO: decouple data from experiment
+        self.batch_size = batch_size
         self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.2]), torch.tensor([1.2]))
         
     def configure_optimizers(self) -> Optimizer: 
@@ -32,7 +38,7 @@ class SdfExperiment(pl.LightningModule):
         return  torch.optim.Adam(self.sdf_model.parameters(), lr=0.00001, amsgrad=True)
     
     def eikonal_loss(self, gradient: torch.Tensor) -> torch.Tensor:
-        grad_norm = torch.linalg.norm(gradient, p=2, dim=-1)
+        grad_norm = torch.linalg.norm(gradient, ord=2, dim=-1)
         return F.mse_loss(grad_norm, torch.ones_like(grad_norm)) 
     
     def grad_direction_loss(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
@@ -40,7 +46,7 @@ class SdfExperiment(pl.LightningModule):
         return F.mse_loss(grad_dot_normal, torch.ones_like(grad_dot_normal))
         
 
-    def training_step(self, batch: torch.Tensor, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
+    def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         batch_vertices, batch_normals = batch
         batch_size = batch_vertices.shape[0]
         
@@ -66,10 +72,10 @@ class SdfExperiment(pl.LightningModule):
 
         if self.enforce_eikonality: 
             random_points = self.random_sampler.sample((batch_size, 3))  # type: ignore
-            random_points = random_points.to(self.device).requires_grad_(True)
+            random_points = random_points.to(self.device).requires_grad_(True)[:, :, 0]
             sdf_output = self.sdf_model.forward(random_points)
             gradient, = autograd.grad(
-                outputs=sdf_output.sum(), inputs=batch_vertices, retain_graph=True, create_graph=True,
+                outputs=sdf_output.sum(), inputs=random_points, retain_graph=True, create_graph=True,
             )
             eikonal_loss += self.eikonal_loss(gradient)
         
@@ -82,3 +88,7 @@ class SdfExperiment(pl.LightningModule):
         self.log('grad_direction_loss', grad_direction_loss, prog_bar=True)
         
         return loss
+    
+    def train_dataloader(self) -> DataLoader:
+        mesh_dataset = MeshDataset(self.mesh_path)
+        return DataLoader(mesh_dataset, batch_size=self.batch_size, shuffle=True)
