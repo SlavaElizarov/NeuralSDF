@@ -49,6 +49,8 @@ class SdfExperiment(pl.LightningModule):
         
         self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.2]), torch.tensor([1.2]))
         
+        self.save_hyperparameters()
+        
     def configure_optimizers(self) -> Optimizer: 
         """ 
             Can be overrided in config
