@@ -1,7 +1,9 @@
+from turtle import forward
 from typing import Optional
 import torch
 from torch import nn
-import numpy as np  
+import numpy as np
+
 
 class SinActivation(nn.Module):
     def __init__(self, omega_0: float = 1.0):
@@ -138,6 +140,16 @@ class ModulatedSirenLayer(SirenLayer):
         return super().forward(x, scale, shift)
 
 
+class SirenGeometricHead(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        sdf_output = torch.sign(x) * torch.sqrt(x.abs() + 1e-8)
+        sdf_output -= 1.6
+        return sdf_output
+
+
 class Siren(nn.Sequential):
     def __init__(
         self,
@@ -148,6 +160,7 @@ class Siren(nn.Sequential):
         outermost_linear=False,
         first_omega_0=30,
         hidden_omega_0=30.0,
+        use_geometric_initialization=False,
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
@@ -161,6 +174,10 @@ class Siren(nn.Sequential):
             first_omega_0 (float, optional): Omega for first layer. Defaults to 30.
             hidden_omega_0 (float, optional): omega_0 is a frequency factor which simply multiplies
                                             the activations before the nonlinearity. Defaults to 30.
+            use_geometric_initialization (bool, optional): Use geometric initialization.
+                    The main idea is to start from SDF of a sphere.
+                    For details check https://arxiv.org/abs/2106.10811
+                    Defaults to False.
         """
         super().__init__()
 
@@ -197,4 +214,99 @@ class Siren(nn.Sequential):
                 )
             )
 
+        if use_geometric_initialization:
+            layers.append(SirenGeometricHead())
+
         super().__init__(*layers)
+
+        if use_geometric_initialization:
+            self.geometric_init()
+
+    def geometric_init(self):
+        assert len(self) >= 5, "Geometric initialization is only applicable for a network with at least 5 layers"
+        # shamelessly copied from https://github.com/Chumbyte/DiGS/blob/main/models/DiGS.py
+        # TODO: refactor it 
+        def geom_sine_init(m):
+            with torch.no_grad():
+                if hasattr(m, 'weight'):
+                    num_output = m.weight.size(0)
+                    m.weight.uniform_(-np.sqrt(3 / num_output), np.sqrt(3 / num_output))
+                    m.bias.uniform_(-1 / (num_output * 1000), 1 / (num_output * 1000))
+                    m.weight.data /= 30
+                    m.bias.data /= 30
+
+        def second_last_layer_geom_sine_init(m):
+            with torch.no_grad():
+                if hasattr(m, 'weight'):
+                    num_output = m.weight.size(0)
+                    assert m.weight.shape == (num_output, num_output)
+                    m.weight.data = 0.5 * np.pi * torch.eye(num_output) + 0.001 * torch.randn(num_output, num_output)
+                    m.bias.data = 0.5 * np.pi * torch.ones(
+                        num_output,
+                    ) + 0.001 * torch.randn(num_output)
+                    m.weight.data /= 30
+                    m.bias.data /= 30
+
+        def last_layer_geom_sine_init(m):
+            with torch.no_grad():
+                if hasattr(m, 'weight'):
+                    num_input = m.weight.size(-1)
+                    assert m.weight.shape == (1, num_input)
+                    assert m.bias.shape == (1,)
+                    # m.weight.data = -1 * torch.ones(1, num_input) + 0.001 * torch.randn(num_input)
+                    m.weight.data = -1 * torch.ones(1, num_input) + 0.00001 * torch.randn(num_input)
+                    m.bias.data = torch.zeros(1) + num_input
+
+        # ################################# multi frequency geometric initialization ###################################
+        # periods = [1, 30] # Number of periods of sine the values of each section of the output vector should hit
+        # # periods = [1, 60] # Number of periods of sine the values of each section of the output vector should hit
+        # portion_per_period = np.array([0.25, 0.75]) # Portion of values per section/period
+
+        def first_layer_mfgi_init(m):
+            periods = [1, 30]
+            portion_per_period = np.array([0.25, 0.75])
+            with torch.no_grad():
+                if hasattr(m, 'weight'):
+                    num_input = m.weight.size(-1)
+                    num_output = m.weight.size(0)
+                    num_per_period = (portion_per_period * num_output).astype(
+                        int
+                    )  # Number of values per section/period
+                    assert len(periods) == len(num_per_period)
+                    assert sum(num_per_period) == num_output
+                    weights = []
+                    for i in range(0, len(periods)):
+                        period = periods[i]
+                        num = num_per_period[i]
+                        scale = 30 / period
+                        weights.append(
+                            torch.zeros(num, num_input).uniform_(
+                                -np.sqrt(3 / num_input) / scale, np.sqrt(3 / num_input) / scale
+                            )
+                        )
+                    W0_new = torch.cat(weights, axis=0)
+                    m.weight.data = W0_new
+
+        def second_layer_mfgi_init(m):
+            portion_per_period = np.array([0.25, 0.75])
+            with torch.no_grad():
+                if hasattr(m, 'weight'):
+                    num_input = m.weight.size(-1)
+                    assert m.weight.shape == (num_input, num_input)
+                    num_per_period = (portion_per_period * num_input).astype(int)  # Number of values per section/period
+                    k = num_per_period[0]  # the portion that only hits the first period
+                    # W1_new = torch.zeros(num_input, num_input).uniform_(-np.sqrt(3 / num_input), np.sqrt(3 / num_input) / 30) * 0.00001
+                    W1_new = (
+                        torch.zeros(num_input, num_input).uniform_(-np.sqrt(3 / num_input), np.sqrt(3 / num_input) / 30)
+                        * 0.0005
+                    )
+                    W1_new_1 = torch.zeros(k, k).uniform_(-np.sqrt(3 / num_input) / 30, np.sqrt(3 / num_input) / 30)
+                    W1_new[:k, :k] = W1_new_1
+                    m.weight.data = W1_new
+
+
+        self.apply(geom_sine_init)
+        self[0].linear.apply(first_layer_mfgi_init)
+        self[1].linear.apply(second_layer_mfgi_init)
+        self[-3].linear.apply(second_last_layer_geom_sine_init)
+        self[-2].apply(last_layer_geom_sine_init)
