@@ -34,7 +34,7 @@ class SphereTracingRenderer():
                 d = torch.zeros_like(t)
                 points = origin + t[:, None] * directions # move along ray on t units
                 points = self.camera.project(points) # project points to camera coordinates           
-                d[condition] = sdf(points[condition])
+                d[condition] = sdf(points[condition])[:, 0]
                 
                 t = t + d
             
@@ -53,7 +53,7 @@ class SphereTracingRenderer():
         hit_points = points[is_hit].clone()
         hit_points.requires_grad_(True)
         d = sdf(hit_points)
-        gradient, = autograd.grad(outputs=d.sum(), inputs=hit_points, retain_graph=True, create_graph=True,)
+        gradient, = autograd.grad(outputs=d.sum(), inputs=hit_points)
 
         frame = torch.zeros_like(points)
         frame[is_hit] = (gradient/ torch.linalg.norm(gradient, dim=-1, keepdim=True)) *0.5+0.5 

@@ -17,6 +17,7 @@ model:
       outermost_linear: True
       first_omega_0: 50.
       hidden_omega_0: 30.
+      use_geometric_initialization: True
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
@@ -31,10 +32,12 @@ model:
   eikonal_loss_weight: 1.0
 
   #   (type: float, default: 1)
-  grad_direction_loss_weight: 1.0
+  grad_direction_loss_weight: 5.0
 
   #   (type: bool, default: True)
   enforce_eikonality: true
+
+  offsurface_loss_weight: 0.0
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
@@ -53,13 +56,6 @@ trainer:
   # Default: ``True``. (type: Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool], default: True, known subclasses: pytorch_lightning.loggers.LoggerCollection, pytorch_lightning.loggers.base.DummyLogger, pytorch_lightning.loggers.CSVLogger, pytorch_lightning.loggers.TensorBoardLogger, pytorch_lightning.loggers.CometLogger, pytorch_lightning.loggers.MLFlowLogger, pytorch_lightning.loggers.NeptuneLogger, pytorch_lightning.loggers.TestTubeLogger, pytorch_lightning.loggers.WandbLogger)
   logger: true
 
-  # If ``True``, enable checkpointing.
-  # Default: ``None``.
-
-  # .. deprecated:: v1.5
-  #     ``checkpoint_callback`` has been deprecated in v1.5 and will be removed in v1.7.
-  #     Please consider using ``enable_checkpointing`` instead. (type: Union[bool, null], default: null)
-  checkpoint_callback:
 
   # If ``True``, enable checkpointing.
   # It will configure a default ModelCheckpoint callback if there is no user-defined ModelCheckpoint in
@@ -69,7 +65,8 @@ trainer:
 
   # Add a callback or list of callbacks.
   # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GPUStatsMonitor, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.ProgressBar, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.callbacks.XLAStatsMonitor, pytorch_lightning.utilities.cli.SaveConfigCallback)
-  callbacks:
+  callbacks: 
+    - train_sdf.VisualizationCalback
 
   # Default path for logs and weights when no logger/ckpt_callback passed.
   # Default: ``os.getcwd()``.
