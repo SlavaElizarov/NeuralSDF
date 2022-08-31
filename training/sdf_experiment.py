@@ -5,6 +5,8 @@ from torch.nn import functional as F
 from torch import autograd
 from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
+from torch.optim.lr_scheduler import ExponentialLR
+
 from models.siren import Siren
 
 from training.dataset import MeshDataset
@@ -19,7 +21,9 @@ class SdfExperiment(pl.LightningModule):
                  eikonal_loss_weight: float = 1,
                  grad_direction_loss_weight: float = 1,
                  enforce_eikonality: bool = True,
-                 offsurface_loss_weight: float = 0.,
+                 offsurface_loss_weight: float = 0,
+                 divergence_loss_weitht: float = 0.001,
+                 learning_rate: float = 0.00001,
                  ):
         """
         Train a SDF model of a mesh.
@@ -33,6 +37,7 @@ class SdfExperiment(pl.LightningModule):
             grad_direction_loss_weight (float, optional): _description_. Defaults to 1.
             enforce_eikonality (bool, optional): _description_. Defaults to True.
             offsurface_loss_weight (float, optional): _description_. Defaults to 0..
+            
         """
         super().__init__()
         
@@ -43,26 +48,37 @@ class SdfExperiment(pl.LightningModule):
         self.grad_direction_loss_weight = grad_direction_loss_weight
         self.enforce_eikonality = enforce_eikonality
         self.offsurface_loss_weight = offsurface_loss_weight
+        self.divergence_loss_weitht = divergence_loss_weitht
         self.mesh_path = mesh_path # it's a bit of an antipatern to have this here TODO: decouple data from experiment
         self.batch_size = batch_size
+        self.learning_rate = learning_rate
         
-        
-        self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.2]), torch.tensor([1.2]))
+        self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.1]), torch.tensor([1.1]))
                 
-    def configure_optimizers(self) -> Optimizer: 
+    def configure_optimizers(self): 
         """ 
             Can be overrided in config
         """
-        return  torch.optim.Adam(self.sdf_model.parameters(), lr=0.00001, amsgrad=True)
-    
+        optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
+        scheduler = ExponentialLR(optimizer, gamma=0.96)
+        return  [optimizer], [scheduler]
+        
     def eikonal_loss(self, gradient: torch.Tensor) -> torch.Tensor:
         grad_norm = torch.linalg.norm(gradient, ord=2, dim=-1)
-        return F.mse_loss(grad_norm, torch.ones_like(grad_norm)) 
+        return F.l1_loss(grad_norm, torch.ones_like(grad_norm)) 
     
     def grad_direction_loss(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         # grad_dot_normal = torch.sum(gradient * normals, dim=-1)
         # return F.mse_loss(grad_dot_normal, torch.ones_like(grad_dot_normal))
         return (1 - torch.abs(F.cosine_similarity(gradient, normals, dim=-1))).mean()
+    
+    def divergence_loss(self, points: torch.Tensor, gradient: torch.Tensor) -> torch.Tensor:
+        dx, = autograd.grad(gradient[:,0].sum(), points, create_graph=True, retain_graph=True)
+        dy, = autograd.grad(gradient[:,1].sum(), points, create_graph=True, retain_graph=True)
+        dz, = autograd.grad(gradient[:,2].sum(), points, create_graph=True, retain_graph=True)
+        
+        div = dx[:, 0] + dy[:, 1] + dz[:, 2]
+        return torch.abs(div).mean()
         
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
@@ -73,7 +89,7 @@ class SdfExperiment(pl.LightningModule):
         sdf_output = self.sdf_model.forward(batch_vertices)
 
         # SDF must be 0 at the boundary
-        level_set_loss = F.mse_loss(sdf_output, torch.zeros_like(sdf_output))
+        level_set_loss = torch.abs(sdf_output).mean()
 
         # ||grad(SDF)|| must be 1 (eikonal equation) 
         # and share direction with a normal to a point on the surface
@@ -83,6 +99,7 @@ class SdfExperiment(pl.LightningModule):
         
         eikonal_loss = self.eikonal_loss(gradient)
         grad_direction_loss = self.grad_direction_loss(gradient, batch_normals)
+        # manifold_loss = self.manifold_loss(batch_vertices, batch_normals)
         
         
         if self.enforce_eikonality or self.offsurface_loss_weight > 0:
@@ -98,17 +115,21 @@ class SdfExperiment(pl.LightningModule):
             gradient, = autograd.grad(
                 outputs=sdf_output.sum(), inputs=random_points, retain_graph=True, create_graph=True,
             )
+            divergence_loss = self.divergence_loss(random_points, gradient)
             eikonal_loss += self.eikonal_loss(gradient)
             
                 
         
         loss = level_set_loss * self.level_set_loss_weight + \
                 eikonal_loss * self.eikonal_loss_weight + \
-                grad_direction_loss * self.grad_direction_loss_weight 
+                grad_direction_loss * self.grad_direction_loss_weight + \
+                divergence_loss * self.divergence_loss_weitht
         
         # there is a big problem with this loss. There is no garauntee that random points are off the surface.
         if self.offsurface_loss_weight > 0:
-            offsurface_loss = torch.exp(-1e2 * torch.abs(sdf_output)).mean()
+            # offsurface_loss = torch.exp(-1e2 * torch.abs(sdf_output)).mean()
+            soft_delta = 2 / (torch.pi*(4 + sdf_output**2))
+            offsurface_loss = soft_delta.mean()
             loss += offsurface_loss * self.offsurface_loss_weight
             
             self.log('offsurface_loss', offsurface_loss, prog_bar=True)
@@ -117,6 +138,7 @@ class SdfExperiment(pl.LightningModule):
         self.log('level_set_loss', level_set_loss, prog_bar=True)
         self.log('eikonal_loss', eikonal_loss, prog_bar=True)
         self.log('grad_direction_loss', grad_direction_loss, prog_bar=True)
+        self.log('divergence_loss', divergence_loss, prog_bar=True)
         
         return loss
     
