@@ -1,5 +1,4 @@
-from typing import Callable, List
-from enum import Enum
+from typing import Callable
 
 import torch
 from torch import nn
@@ -34,7 +33,7 @@ class ImplicitAttetionLayer(nn.Module):
             input_dim (int, optional): Input dimention. Defaults to 256.
             attention_dim (int, optional): Size of Q and K_h. Defaults to 64.
             output_dim (int, optional): Size of V_h. Defaults to 256.
-            values_projection_factory (Callable[[int, int], nn.Module], optional): 
+            values_projection_factory (Callable[[int, int], nn.Module], optional):
                     Factory function for creating input to values projection. Defaults to Linear projection.
         """
         super().__init__()
@@ -43,19 +42,25 @@ class ImplicitAttetionLayer(nn.Module):
         self.attention_dim = attention_dim
 
         self.keys_projections = torch.nn.ModuleList([nn.Linear(input_dim, attention_dim) for _ in range(n_heads)])
-        self.values_projections = torch.nn.ModuleList([values_projection_factory(input_dim, output_dim) for _ in range(n_heads)])
+        self.values_projections = torch.nn.ModuleList(
+            [values_projection_factory(input_dim, output_dim) for _ in range(n_heads)]
+        )
         self.query_projection = torch.nn.Linear(input_dim, attention_dim)
         self.scale_dot = scale_dot
 
     def forward(self, x):
-        query = self.query_projection(x) # (batch_size, attention_dim)
-        keys = torch.stack([key_projection(x) for key_projection in self.keys_projections], dim=-1) # (batch_size, attention_dim, n_heads)
-        values = torch.stack([value_projection(x) for value_projection in self.values_projections], dim=-1) # (batch_size, output_dim, n_heads)
-        
-        attention_dot = torch.einsum("ba,bah->bh", query, keys) # (batch_size, n_heads)
+        query = self.query_projection(x)  # (batch_size, attention_dim)
+        keys = torch.stack(
+            [key_projection(x) for key_projection in self.keys_projections], dim=-1
+        )  # (batch_size, attention_dim, n_heads)
+        values = torch.stack(
+            [value_projection(x) for value_projection in self.values_projections], dim=-1
+        )  # (batch_size, output_dim, n_heads)
+
+        attention_dot = torch.einsum("ba,bah->bh", query, keys)  # (batch_size, n_heads)
         if self.scale_dot:
-            attention_dot = attention_dot / np.sqrt(self.attention_dim) # Following the paper Attention is all you need
-        
-        attention = torch.softmax(attention_dot, dim=-1) # (batch_size, n_heads)
-        
-        return torch.einsum("bh,boh->bo", attention, values) # (batch_size, output_dim)
+            attention_dot = attention_dot / np.sqrt(self.attention_dim)  # Following the paper Attention is all you need
+
+        attention = torch.softmax(attention_dot, dim=-1)  # (batch_size, n_heads)
+
+        return torch.einsum("bh,boh->bo", attention, values)  # (batch_size, output_dim)
