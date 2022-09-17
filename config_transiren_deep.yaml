@@ -8,27 +8,28 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.siren.TransSiren
     init_args: 
       in_features: 3
-      hidden_features: 512
-      hidden_layers: 6
+      hidden_features: 128
+      hidden_layers: 8
       out_features: 1
       outermost_linear: True
       first_omega_0: 50.
       hidden_omega_0: 30.
-      use_geometric_initialization: False
+      linear_map_output: False
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
 
+  #   (type: int, default: 1024)
   batch_size: 6000
 
   #   (type: float, default: 10)
-  level_set_loss_weight: 100.0
+  level_set_loss_weight: 200.0
 
   #   (type: float, default: 1)
-  eikonal_loss_weight: 2.0
+  eikonal_loss_weight: 2.
 
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
@@ -36,9 +37,9 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 10.0
+  offsurface_loss_weight: 50.0
 
-  divergence_loss_weitht: 0.000
+  divergence_loss_weitht: 0.005
 
   learning_rate: 0.00003
 

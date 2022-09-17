@@ -26,7 +26,7 @@ class MeshDataset(Dataset):
         
         
         if n_points_to_sample == -1:
-            n_points_to_sample = self.vertices.shape[0] * 20
+            n_points_to_sample = self.vertices.shape[0] * 10
         
         # There is a problem with such strategy since sample weight is proportional to face area
         # So biggest faces are sampled more than smaller ones it can cause a lack of details 

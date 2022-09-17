@@ -7,14 +7,12 @@ from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import ExponentialLR
 
-from models.siren import Siren
-
 from training.dataset import MeshDataset
 
 
 class SdfExperiment(pl.LightningModule):
     def __init__(self, 
-                 sdf_model: Siren, 
+                 sdf_model: nn.Module, 
                  mesh_path: str,
                  batch_size: int = 1024,
                  level_set_loss_weight: float = 10,
@@ -24,6 +22,8 @@ class SdfExperiment(pl.LightningModule):
                  offsurface_loss_weight: float = 0,
                  divergence_loss_weitht: float = 0.001,
                  learning_rate: float = 0.00001,
+                 learning_rate_decay: float = 0.94,
+                 kernel_coefficient : float = 70,
                  ):
         """
         Train a SDF model of a mesh.
@@ -52,6 +52,8 @@ class SdfExperiment(pl.LightningModule):
         self.mesh_path = mesh_path # it's a bit of an antipatern to have this here TODO: decouple data from experiment
         self.batch_size = batch_size
         self.learning_rate = learning_rate
+        self.learning_rate_decay = learning_rate_decay
+        self.kernel_coefficient = kernel_coefficient
         
         self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.1]), torch.tensor([1.1]))
                 
@@ -60,7 +62,7 @@ class SdfExperiment(pl.LightningModule):
             Can be overrided in config
         """
         optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
-        scheduler = ExponentialLR(optimizer, gamma=0.96)
+        scheduler = ExponentialLR(optimizer, gamma=self.learning_rate_decay)
         return  [optimizer], [scheduler]
         
     def eikonal_loss(self, gradient: torch.Tensor) -> torch.Tensor:
@@ -127,9 +129,18 @@ class SdfExperiment(pl.LightningModule):
         
         # there is a big problem with this loss. There is no garauntee that random points are off the surface.
         if self.offsurface_loss_weight > 0:
-            # offsurface_loss = torch.exp(-1e2 * torch.abs(sdf_output)).mean()
-            soft_delta = 2 / (torch.pi*(4 + sdf_output**2))
-            offsurface_loss = soft_delta.mean()
+            offsurface_loss_plus = (F.relu(0.0015 - F.relu(sdf_output)) * 100).mean()
+            # offsurface_loss_minus = (F.relu(0.003 - F.relu(sdf_output * -1)) * 10).mean()
+            offsurface_loss = offsurface_loss_plus #+ offsurface_loss_minus
+            # a = a[torch.abs(sdf_output) < 0.01]
+            # offsurface_loss = torch.exp(-self.kernel_coefficient * a).mean()
+            
+            # отжиг ядра, делай уже блэдь
+            # блэдь
+            # offsurface_loss = torch.exp(-(self.kernel_coefficient * sdf_output) ** 2 +0.001).mean()
+
+            # soft_delta = 2 / (torch.pi*(4 + sdf_output**2))
+            # offsurface_loss = soft_delta.mean()
             loss += offsurface_loss * self.offsurface_loss_weight
             
             self.log('offsurface_loss', offsurface_loss, prog_bar=True)
