@@ -12,7 +12,7 @@ class ImplicitAttetionLayer(nn.Module):
         input_dim: int = 256,
         attention_dim: int = 64,
         output_dim: int = 256,
-        values_projection_factory: Callable[[int, int], nn.Module] = lambda input_dim, output_dim: nn.Linear(
+        values_projection_factory: Callable[[int, int, int], nn.Module] = lambda input_dim, output_dim, head_id: nn.Linear(
             input_dim, output_dim
         ),
         scale_dot: bool = True,
