@@ -130,6 +130,7 @@ class SdfExperiment(pl.LightningModule):
         
         # there is a big problem with this loss. There is no garauntee that random points are off the surface.
         if self.offsurface_loss_weight > 0:
+            # TODO: careful analysis of this loss is required
             offsurface_loss_plus = (F.relu(0.0015 - F.relu(sdf_output)) * 100).mean()
             # offsurface_loss_minus = (F.relu(0.003 - F.relu(sdf_output * -1)) * 10).mean()
             offsurface_loss = offsurface_loss_plus #+ offsurface_loss_minus
@@ -153,6 +154,11 @@ class SdfExperiment(pl.LightningModule):
         
         return loss
     
+    # TODO: decouple dataset from experiment, add paprameters to config
     def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=1.0)
-        return DataLoader(mesh_dataset, batch_size=self.batch_size, shuffle=True)
+        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=1.0, device='cpu')
+        return DataLoader(mesh_dataset, batch_size=self.batch_size,
+                          shuffle=True, 
+                          pin_memory=True, 
+                          num_workers=4,
+                          persistent_workers = True)
