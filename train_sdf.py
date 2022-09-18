@@ -1,7 +1,7 @@
 from typing import Callable
 import torch
 from torch.utils.tensorboard.writer import SummaryWriter
-from pytorch_lightning.utilities.cli import LightningCLI
+from pytorch_lightning.cli import LightningCLI
 import pytorch_lightning as pl
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer

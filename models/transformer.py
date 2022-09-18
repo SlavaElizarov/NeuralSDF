@@ -1,7 +1,5 @@
-from typing import List
 from enum import Enum
 
-import torch
 from torch import nn
 import numpy as np
 from models.attention import ImplicitAttetionLayer
@@ -26,24 +24,21 @@ class SirenLinear(SirenLayer):
         omega_0: float = 30,
         initializationType=InitializationType.SIREN_UNIFORM,
     ):
-        super().__init__(in_features, out_features, bias, is_first, omega_0)
         self.initializationType = initializationType
+        super().__init__(in_features, out_features, bias, is_first, omega_0)
 
         # main difference from SirenLayer is that we don't use activation
-        self.activation = lambda x: x
+        self.activation = nn.Identity()
 
     def init_weights(self):
         if self.initializationType == InitializationType.SIREN_UNIFORM:
             super().init_weights()
         elif self.initializationType == InitializationType.SIREN_NORMAL:
             if self.is_first:
-                nn.init.normal_(self.linear.weight, -1 / self.in_features, 1 / self.in_features)
+                raise ValueError("SirenNormal can't be used with first layer")
             else:
-                nn.init.normal_(
-                    self.linear.weight,
-                    -np.sqrt(6 / self.in_features) / self.omega_0,
-                    np.sqrt(6 / self.in_features) / self.omega_0,
-                )
+                nn.init.normal_(self.linear.weight, 0, np.sqrt(2 / self.in_features) / self.omega_0)
+
 
 
 class TransSiren(nn.Sequential, SDF):
@@ -59,6 +54,9 @@ class TransSiren(nn.Sequential, SDF):
         initializationType=InitializationType.SIREN_UNIFORM,
     ):
         super().__init__()
+        
+        if isinstance(initializationType, str):
+            initializationType = InitializationType[initializationType]
 
         layers = []
         layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
@@ -70,7 +68,10 @@ class TransSiren(nn.Sequential, SDF):
                     input_dim=hidden_features,
                     output_dim=hidden_features,
                     values_projection_factory=lambda _in, _out, _: SirenLinear(
-                        _in, _out, is_first=False, omega_0=hidden_omega_0, initializationType=initializationType
+                        _in, _out, 
+                        is_first=False, 
+                        omega_0=hidden_omega_0, 
+                        initializationType=initializationType
                     ),
                 )
             )
@@ -88,43 +89,5 @@ class TransSiren(nn.Sequential, SDF):
                     omega_0=hidden_omega_0,
                 )
             )
-
-        super().__init__(*layers)
-
-
-class BandTransSiren(nn.Sequential, SDF):
-    def __init__(
-        self,
-        in_features: int,
-        hidden_features: int,
-        hidden_layers: int,
-        out_features: int,
-        outermost_linear=True,
-    ):
-        super().__init__()
-
-        layers = []
-        # layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=50))
-        layers.append(
-            ImplicitBandAttetionLayer(
-                input_dim=in_features, hidden_dim=hidden_features, omega_0=[5, 15, 30, 60, 90], is_first=True
-            )
-        )
-
-        for i in range(hidden_layers):
-            layers.append(
-                ImplicitBandAttetionLayer(input_dim=hidden_features, hidden_dim=hidden_features, is_first=False)
-            )
-
-        if outermost_linear:
-            final_linear = nn.Linear(hidden_features, out_features)
-
-            nn.init.uniform_(
-                final_linear.weight,
-                -np.sqrt(6 / hidden_features) / 50,
-                np.sqrt(6 / hidden_features) / 50,
-            )
-
-            layers.append(final_linear)
 
         super().__init__(*layers)

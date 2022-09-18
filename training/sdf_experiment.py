@@ -4,15 +4,16 @@ from torch import nn
 from torch.nn import functional as F
 from torch import autograd
 from torch.utils.data import DataLoader
-from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import ExponentialLR
+from models.sdf import SDF
+from models.transformer import TransSiren
 
 from training.dataset import MeshDataset
 
 
 class SdfExperiment(pl.LightningModule):
     def __init__(self, 
-                 sdf_model: nn.Module, 
+                 sdf_model: SDF, 
                  mesh_path: str,
                  batch_size: int = 1024,
                  level_set_loss_weight: float = 10,
@@ -61,7 +62,7 @@ class SdfExperiment(pl.LightningModule):
         """ 
             Can be overrided in config
         """
-        optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
+        optimizer = torch.optim.AdamW(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
         scheduler = ExponentialLR(optimizer, gamma=self.learning_rate_decay)
         return  [optimizer], [scheduler]
         

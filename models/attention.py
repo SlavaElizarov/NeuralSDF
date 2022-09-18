@@ -43,7 +43,7 @@ class ImplicitAttetionLayer(nn.Module):
 
         self.keys_projections = torch.nn.ModuleList([nn.Linear(input_dim, attention_dim) for _ in range(n_heads)])
         self.values_projections = torch.nn.ModuleList(
-            [values_projection_factory(input_dim, output_dim) for _ in range(n_heads)]
+            [values_projection_factory(input_dim, output_dim, i) for i in range(n_heads)]
         )
         self.query_projection = torch.nn.Linear(input_dim, attention_dim)
         self.scale_dot = scale_dot
@@ -53,6 +53,7 @@ class ImplicitAttetionLayer(nn.Module):
         keys = torch.stack(
             [key_projection(x) for key_projection in self.keys_projections], dim=-1
         )  # (batch_size, attention_dim, n_heads)
+        
         values = torch.stack(
             [value_projection(x) for value_projection in self.values_projections], dim=-1
         )  # (batch_size, output_dim, n_heads)
