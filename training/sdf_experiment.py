@@ -155,5 +155,5 @@ class SdfExperiment(pl.LightningModule):
         return loss
     
     def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(self.mesh_path)
+        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=1.0)
         return DataLoader(mesh_dataset, batch_size=self.batch_size, shuffle=True)
