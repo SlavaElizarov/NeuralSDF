@@ -1,3 +1,4 @@
+# pytorch_lightning==1.7.6
 
 # Set to an int to run seed_everything with this value before classes instantiation (type: Union[int, null], default: 42)
 seed_everything: 42
@@ -22,13 +23,14 @@ model:
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
 
+  #   (type: int, default: 1024)
   batch_size: 6000
 
   #   (type: float, default: 10)
   level_set_loss_weight: 100.0
 
   #   (type: float, default: 1)
-  eikonal_loss_weight: 2.0
+  eikonal_loss_weight: 2.
 
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
@@ -36,9 +38,9 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 10.0
+  offsurface_loss_weight: 30.0
 
-  divergence_loss_weitht: 0.000
+  divergence_loss_weitht: 0.005
 
   learning_rate: 0.00003
 
@@ -46,38 +48,27 @@ model:
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
-# training will start from the beginning of the next epoch. (type: Union[str, null], default: null)
-ckpt_path: 
+# training will start from the beginning of the next epoch. (type: Optional[str], default: null)
+ckpt_path:
+
 
 # Customize every aspect of training via flags
 trainer:
 
-  # Logger (or iterable collection of loggers) for experiment tracking. A ``True`` value uses
-  # the default ``TensorBoardLogger``. ``False`` will disable logging. If multiple loggers are
-  # provided and the `save_dir` property of that logger is not set, local files (checkpoints,
-  # profiler traces, etc.) are saved in ``default_root_dir`` rather than in the ``log_dir`` of any
-  # of the individual loggers.
-  # Default: ``True``. (type: Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool], default: True, known subclasses: pytorch_lightning.loggers.LoggerCollection, pytorch_lightning.loggers.base.DummyLogger, pytorch_lightning.loggers.CSVLogger, pytorch_lightning.loggers.TensorBoardLogger, pytorch_lightning.loggers.CometLogger, pytorch_lightning.loggers.MLFlowLogger, pytorch_lightning.loggers.NeptuneLogger, pytorch_lightning.loggers.TestTubeLogger, pytorch_lightning.loggers.WandbLogger)
   logger: true
 
-
-  # If ``True``, enable checkpointing.
-  # It will configure a default ModelCheckpoint callback if there is no user-defined ModelCheckpoint in
-  # :paramref:`~pytorch_lightning.trainer.trainer.Trainer.callbacks`.
-  # Default: ``True``. (type: bool, default: True)
   enable_checkpointing: true
 
   # Add a callback or list of callbacks.
-  # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GPUStatsMonitor, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.ProgressBar, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.callbacks.XLAStatsMonitor, pytorch_lightning.utilities.cli.SaveConfigCallback)
+  # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.VisualizationCalback)
   callbacks: 
     - train_sdf.VisualizationCalback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
 
-
   # Default path for logs and weights when no logger/ckpt_callback passed.
   # Default: ``os.getcwd()``.
-  # Can be remote file paths such as `s3://mybucket/path` or 'hdfs://path/' (type: Union[str, null], default: null)
+  # Can be remote file paths such as `s3://mybucket/path` or 'hdfs://path/' (type: Optional[str], default: null)
   default_root_dir:
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
@@ -87,31 +78,17 @@ trainer:
 
   # The gradient clipping algorithm to use. Pass ``gradient_clip_algorithm="value"``
   # to clip by value, and ``gradient_clip_algorithm="norm"`` to clip by norm. By default it will
-  # be set to ``"norm"``. (type: Union[str, null], default: null)
+  # be set to ``"norm"``. (type: Optional[str], default: null)
   gradient_clip_algorithm:
-
-  # Orders the progress bar when running multiple models on same machine.
-  # .. deprecated:: v1.5
-  #     ``process_position`` has been deprecated in v1.5 and will be removed in v1.7.
-  #     Please pass :class:`~pytorch_lightning.callbacks.progress.TQDMProgressBar` with ``process_position``
-  #     directly to the Trainer's ``callbacks`` argument instead. (type: int, default: 0)
-  process_position: 0
 
   # Number of GPU nodes for distributed training.
   # Default: ``1``. (type: int, default: 1)
   num_nodes: 1
 
-  # Number of processes for distributed training with ``accelerator="cpu"``.
-  # Default: ``1``. (type: Union[int, null], default: null)
-  num_processes:
-
   # Will be mapped to either `gpus`, `tpu_cores`, `num_processes` or `ipus`,
   # based on the accelerator type. (type: Union[List[int], str, int, null], default: null)
-  devices:
+  devices: 1
 
-  # Number of GPUs to train on (int) or which GPUs to train on (list or str) applied per node
-  # Default: ``None``. (type: Union[List[int], str, int, null], default: null)
-  gpus: 1
 
   # If enabled and ``gpus`` or ``devices`` is an integer, pick available
   # gpus automatically. This is especially useful when
@@ -120,20 +97,12 @@ trainer:
   # Default: ``False``. (type: bool, default: False)
   auto_select_gpus: true
 
-  # How many TPU cores to train on (1 or 8) / Single TPU to train on (1)
-  # Default: ``None``. (type: Union[List[int], str, int, null], default: null)
-  tpu_cores:
-
-  # How many IPUs to train on.
-  # Default: ``None``. (type: Union[int, null], default: null)
-  ipus:
-
 
   # Whether to enable to progress bar by default.
-  # Default: ``False``. (type: bool, default: True)
+  # Default: ``True``. (type: bool, default: True)
   enable_progress_bar: true
 
-  # Overfit a fraction of training data (float) or a set number of batches (int).
+  # Overfit a fraction of training/validation data (float) or a set number of batches (int).
   # Default: ``0.0``. (type: Union[int, float], default: 0.0)
   overfit_batches: 0.0
 
@@ -142,8 +111,10 @@ trainer:
   # Default: ``-1``. (type: Union[int, float, str], default: -1)
   track_grad_norm: -1
 
-  # Check val every n train epochs.
-  # Default: ``1``. (type: int, default: 1)
+  # Perform a validation loop every after every `N` training epochs. If ``None``,
+  # validation will be done solely based on the number of training batches, requiring ``val_check_interval``
+  # to be an integer value.
+  # Default: ``1``. (type: Optional[int], default: 1)
   check_val_every_n_epoch: 1
 
   # Runs n if set to ``n`` (int) else 1 if set to ``True`` batch(es)
@@ -157,10 +128,10 @@ trainer:
 
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
-  # To enable infinite training, set ``max_epochs = -1``. (type: Union[int, null], default: null)
-  max_epochs: 100
+  # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
+  max_epochs: 128
 
-  # Force training for at least these many epochs. Disabled by default (None). (type: Union[int, null], default: null)
+  # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
   min_epochs:
 
   # Stop training after this number of steps. Disabled by default (-1). If ``max_steps = -1``
@@ -168,7 +139,7 @@ trainer:
   # ``max_epochs`` to ``-1``. (type: int, default: -1)
   max_steps: -1
 
-  # Force training for at least these number of steps. Disabled by default (``None``). (type: Union[int, null], default: null)
+  # Force training for at least these number of steps. Disabled by default (``None``). (type: Optional[int], default: null)
   min_steps:
 
   # Stop training after this amount of time has passed. Disabled by default (``None``).
@@ -195,31 +166,27 @@ trainer:
 
   # How often to check the validation set. Pass a ``float`` in the range [0.0, 1.0] to check
   # after a fraction of the training epoch. Pass an ``int`` to check after a fixed number of training
-  # batches.
+  # batches. An ``int`` value can only be higher than the number of training batches when
+  # ``check_val_every_n_epoch=None``, which validates after every ``N`` training batches
+  # across epochs or during iteration-based training.
   # Default: ``1.0``. (type: Union[int, float, null], default: null)
   val_check_interval:
-
-  # How often to flush logs to disk (defaults to every 100 steps).
-  # .. deprecated:: v1.5
-  #     ``flush_logs_every_n_steps`` has been deprecated in v1.5 and will be removed in v1.7.
-  #     Please configure flushing directly in the logger instead. (type: Union[int, null], default: null)
-  flush_logs_every_n_steps:
 
   # How often to log within steps.
   # Default: ``50``. (type: int, default: 50)
   log_every_n_steps: 50
 
-  # Supports passing different accelerator types ("cpu", "gpu", "tpu", "ipu", "hpu", "auto")
+  # Supports passing different accelerator types ("cpu", "gpu", "tpu", "ipu", "hpu", "mps, "auto")
   # as well as custom accelerator instances.
 
   # .. deprecated:: v1.5
   #     Passing training strategies (e.g., 'ddp') to ``accelerator`` has been deprecated in v1.5.0
-  #     and will be removed in v1.7.0. Please use the ``strategy`` argument instead. (type: Union[str, Accelerator, null], default: null, known subclasses: pytorch_lightning.accelerators.IPUAccelerator, pytorch_lightning.accelerators.CPUAccelerator, pytorch_lightning.accelerators.GPUAccelerator, pytorch_lightning.accelerators.HPUAccelerator, pytorch_lightning.accelerators.TPUAccelerator)
-  accelerator:
+  #     and will be removed in v1.7.0. Please use the ``strategy`` argument instead. (type: Union[str, Accelerator, null], default: null, known subclasses: pytorch_lightning.accelerators.CUDAAccelerator, pytorch_lightning.accelerators.GPUAccelerator, pytorch_lightning.accelerators.IPUAccelerator, pytorch_lightning.accelerators.CPUAccelerator, pytorch_lightning.accelerators.HPUAccelerator, pytorch_lightning.accelerators.MPSAccelerator, pytorch_lightning.accelerators.TPUAccelerator)
+  accelerator: gpu
 
   # Supports different training strategies with aliases
   # as well custom strategies.
-  # Default: ``None``. (type: Union[str, Strategy, null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DDP2Strategy, pytorch_lightning.plugins.DDP2Plugin, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin)
+  # Default: ``None``. (type: Union[str, Strategy, null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin)
   strategy:
 
   # Synchronize batch norm layers between process groups/whole world.
@@ -235,54 +202,27 @@ trainer:
   # Default: ``True``. (type: bool, default: True)
   enable_model_summary: true
 
-  # Prints a summary of the weights when training begins.
-  # .. deprecated:: v1.5
-  #     ``weights_summary`` has been deprecated in v1.5 and will be removed in v1.7.
-  #     To disable the summary, pass ``enable_model_summary = False`` to the Trainer.
-  #     To customize the summary, pass :class:`~pytorch_lightning.callbacks.model_summary.ModelSummary`
-  #     directly to the Trainer's ``callbacks`` argument. (type: Union[str, null], default: top)
-  weights_summary: top
-
-  # Where to save weights if specified. Will override default_root_dir
-  # for checkpoints only. Use this if for whatever reason you need the checkpoints
-  # stored in a different place than the logs written in `default_root_dir`.
-  # Can be remote file paths such as `s3://mybucket/path` or 'hdfs://path/'
-  # Defaults to `default_root_dir`.
-
-  # .. deprecated:: v1.6
-  #     ``weights_save_path`` has been deprecated in v1.6 and will be removed in v1.8. Please pass
-  #     ``dirpath`` directly to the :class:`~pytorch_lightning.callbacks.model_checkpoint.ModelCheckpoint`
-  #     callback. (type: Union[str, null], default: null)
-  weights_save_path:
-
   # Sanity check runs n validation batches before starting the training routine.
   # Set it to `-1` to run all batches in all validation dataloaders.
   # Default: ``2``. (type: int, default: 2)
   num_sanity_val_steps: 2
 
-  # Path/URL of the checkpoint from which training is resumed. If there is
-  # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
-  # training will start from the beginning of the next epoch.
-
-  # .. deprecated:: v1.5
-  #     ``resume_from_checkpoint`` is deprecated in v1.5 and will be removed in v2.0.
-  #     Please pass the path to ``Trainer.fit(..., ckpt_path=...)`` instead. (type: Union[str, Path, null], default: null, known subclasses: pathlib.Path, pathlib.PosixPath, pathlib.WindowsPath)
-  resume_from_checkpoint:
 
   # To profile individual steps during training and assist in identifying bottlenecks.
-  # Default: ``None``. (type: Union[Profiler, str, null], default: null, known subclasses: pytorch_lightning.profiler.AdvancedProfiler, pytorch_lightning.profiler.PassThroughProfiler, pytorch_lightning.profiler.PyTorchProfiler, pytorch_lightning.profiler.SimpleProfiler, pytorch_lightning.profiler.XLAProfiler)
+  # Default: ``None``. (type: Union[Profiler, str, null], default: null, known subclasses: pytorch_lightning.profilers.AdvancedProfiler, pytorch_lightning.profilers.PassThroughProfiler, pytorch_lightning.profilers.PyTorchProfiler, pytorch_lightning.profilers.SimpleProfiler, pytorch_lightning.profilers.XLAProfiler)
   profiler:
 
   # The value (``True`` or ``False``) to set ``torch.backends.cudnn.benchmark`` to.
   # The value for ``torch.backends.cudnn.benchmark`` set in the current session will be used
   # (``False`` if not manually set). If :paramref:`~pytorch_lightning.trainer.Trainer.deterministic` is set
   # to ``True``, this will default to ``False``. Override to manually set a different value.
-  # Default: ``None``. (type: Union[bool, null], default: null)
+  # Default: ``None``. (type: Optional[bool], default: null)
   benchmark:
 
   # If ``True``, sets whether PyTorch operations must use deterministic algorithms.
-  # If not set, defaults to ``False``.
-  # Default: ``None``. (type: Union[bool, null], default: null)
+  # Set to ``"warn"`` to use deterministic algorithms whenever possible, throwing warnings on operations
+  # that don't support deterministic mode (requires PyTorch 1.11+). If not set, defaults to ``False``.
+  # Default: ``None``. (type: Union[bool, Literal['warn'], null], default: null)
   deterministic:
 
   # Set to a non-negative integer to reload dataloaders every n epochs.
@@ -314,17 +254,8 @@ trainer:
   # Default: ``False``. (type: Union[str, bool], default: False)
   auto_scale_batch_size: false
 
-  # If True, each LOCAL_RANK=0 will call prepare data.
-  # Otherwise only NODE_RANK=0, LOCAL_RANK=0 will prepare data
-
-  # .. deprecated:: v1.5
-  #     Deprecated in v1.5.0 and will be removed in v1.7.0
-  #     Please set ``prepare_data_per_node`` in ``LightningDataModule`` and/or
-  #     ``LightningModule`` directly instead. (type: Union[bool, null], default: null)
-  prepare_data_per_node:
-
   # Plugins allow modification of core behavior like ddp and amp, and enable custom lightning plugins.
-  # Default: ``None``. (type: Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str, List[Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str]], null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DDP2Strategy, pytorch_lightning.plugins.DDP2Plugin, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin, pytorch_lightning.plugins.PrecisionPlugin, pytorch_lightning.plugins.precision.MixedPrecisionPlugin, pytorch_lightning.plugins.ApexMixedPrecisionPlugin, pytorch_lightning.plugins.NativeMixedPrecisionPlugin, pytorch_lightning.plugins.ShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.DeepSpeedPrecisionPlugin, pytorch_lightning.plugins.DoublePrecisionPlugin, pytorch_lightning.plugins.HPUPrecisionPlugin, pytorch_lightning.plugins.IPUPrecisionPlugin, pytorch_lightning.plugins.TPUPrecisionPlugin, pytorch_lightning.plugins.TPUBf16PrecisionPlugin, pytorch_lightning.plugins.environments.BaguaEnvironment, pytorch_lightning.plugins.environments.KubeflowEnvironment, pytorch_lightning.plugins.environments.LightningEnvironment, pytorch_lightning.plugins.environments.LSFEnvironment, pytorch_lightning.plugins.environments.SLURMEnvironment, pytorch_lightning.plugins.environments.TorchElasticEnvironment, pytorch_lightning.plugins.TorchCheckpointIO, pytorch_lightning.plugins.HPUCheckpointIO, pytorch_lightning.plugins.XLACheckpointIO, pytorch_lightning.plugins.NativeSyncBatchNorm)
+  # Default: ``None``. (type: Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str, List[Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str]], null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin, pytorch_lightning.plugins.PrecisionPlugin, pytorch_lightning.plugins.precision.MixedPrecisionPlugin, pytorch_lightning.plugins.ApexMixedPrecisionPlugin, pytorch_lightning.plugins.NativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeNativeMixedPrecisionPlugin, pytorch_lightning.plugins.ShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.DeepSpeedPrecisionPlugin, pytorch_lightning.plugins.DoublePrecisionPlugin, pytorch_lightning.plugins.HPUPrecisionPlugin, pytorch_lightning.plugins.IPUPrecisionPlugin, pytorch_lightning.plugins.TPUPrecisionPlugin, pytorch_lightning.plugins.TPUBf16PrecisionPlugin, pytorch_lightning.plugins.environments.BaguaEnvironment, pytorch_lightning.plugins.environments.KubeflowEnvironment, pytorch_lightning.plugins.environments.LightningEnvironment, pytorch_lightning.plugins.environments.LSFEnvironment, pytorch_lightning.plugins.environments.SLURMEnvironment, pytorch_lightning.plugins.environments.TorchElasticEnvironment, pytorch_lightning.plugins.environments.XLAEnvironment, pytorch_lightning.plugins.AsyncCheckpointIO, pytorch_lightning.plugins.TorchCheckpointIO, pytorch_lightning.plugins.HPUCheckpointIO, pytorch_lightning.plugins.XLACheckpointIO, pytorch_lightning.plugins.NativeSyncBatchNorm)
   plugins:
 
   # The mixed precision backend to use ("native" or "apex").
@@ -332,7 +263,7 @@ trainer:
   amp_backend: native
 
   # The optimization level to use (O1, O2, etc...). By default it will be set to "O2"
-  # if ``amp_backend`` is set to "apex". (type: Union[str, null], default: null)
+  # if ``amp_backend`` is set to "apex". (type: Optional[str], default: null)
   amp_level:
 
   # Whether to force internal logged metrics to be moved to cpu.
@@ -347,20 +278,3 @@ trainer:
   # Default: ``"max_size_cycle"``. (type: str, default: max_size_cycle)
   multiple_trainloader_mode: max_size_cycle
 
-  # Whether to use `Stochastic Weight Averaging (SWA)
-  # <https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/>`_.
-  # Default: ``False``.
-
-  # .. deprecated:: v1.5
-  #     ``stochastic_weight_avg`` has been deprecated in v1.5 and will be removed in v1.7.
-  #     Please pass :class:`~pytorch_lightning.callbacks.stochastic_weight_avg.StochasticWeightAveraging`
-  #     directly to the Trainer's ``callbacks`` argument instead. (type: bool, default: False)
-  stochastic_weight_avg: false
-
-  # If set to True, will terminate training (by raising a `ValueError`) at the
-  # end of each training batch, if any of the parameters or the loss are NaN or +/-inf.
-
-  # .. deprecated:: v1.5
-  #     Trainer argument ``terminate_on_nan`` was deprecated in v1.5 and will be removed in 1.7.
-  #     Please use ``detect_anomaly`` instead. (type: Union[bool, null], default: null)
-  terminate_on_nan:
