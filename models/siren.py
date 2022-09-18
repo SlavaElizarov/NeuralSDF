@@ -1,9 +1,9 @@
-from turtle import forward
 from typing import Optional
 import torch
 from torch import nn
 import numpy as np
 
+from models.sdf import SDF
 
 class SinActivation(nn.Module):
     def __init__(self, omega_0: float = 1.0):
@@ -150,7 +150,7 @@ class SirenGeometricHead(nn.Module):
         return sdf_output
 
 
-class Siren(nn.Sequential):
+class Siren(nn.Sequential, SDF):
     def __init__(
         self,
         in_features: int,
@@ -310,3 +310,14 @@ class Siren(nn.Sequential):
         self[1].linear.apply(second_layer_mfgi_init)
         self[-3].linear.apply(second_last_layer_geom_sine_init)
         self[-2].apply(last_layer_geom_sine_init)
+        
+        
+# class GaussianActivation(nn.Module):
+#     def __init__(self, a=1., trainable=True):
+#         super().__init__()
+#         self.register_parameter('a', nn.parameter.Parameter(a*torch.ones(1), trainable))
+
+#     def forward(self, x: torch.Tensor) -> torch.Tensor:
+#         return torch.exp(-x**2/(2*self.a**2))
+
+

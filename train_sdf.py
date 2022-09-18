@@ -1,7 +1,7 @@
 from typing import Callable
 import torch
 from torch.utils.tensorboard.writer import SummaryWriter
-from pytorch_lightning.utilities.cli import LightningCLI
+from pytorch_lightning.cli import LightningCLI
 import pytorch_lightning as pl
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
@@ -23,15 +23,15 @@ class VisualizationCalback(pl.Callback):
         device = 'cuda'):
         
         camera = Camera(dist, elev, azim, resolution=256, device=device)
-        rend = SphereTracingRenderer(camera, max_iteration=max_iteration,max_depth=max_depth )
+        rend = SphereTracingRenderer(camera, max_iteration=max_iteration,max_depth=max_depth, min_dist=0.002)
         frame = rend.render(get_distance).detach()
         return frame
     
     def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
-            frame_front = self.render(model.sdf_model, dist=1.2, elev=0, azim=0, device=model.device)  # type: ignore
-            frame_back = self.render(model.sdf_model, dist=1.2, elev=0, azim=180, device=model.device)  # type: ignore
-            frame_side = self.render(model.sdf_model, dist=1.2, elev=0, azim=90, device=model.device)  # type: ignore
-            frame_top = self.render(model.sdf_model, dist=1.2, elev=90, azim=0, device=model.device)  # type: ignore
+            frame_front = self.render(model.sdf_model, dist=1.3, elev=0, azim=0, device=model.device, max_iteration=40)  # type: ignore
+            frame_back = self.render(model.sdf_model, dist=1.3, elev=0, azim=180, device=model.device, max_iteration=40)  # type: ignore
+            frame_side = self.render(model.sdf_model, dist=1.3, elev=0, azim=90, device=model.device, max_iteration=40)  # type: ignore
+            frame_top = self.render(model.sdf_model, dist=1.3, elev=90, azim=0, device=model.device, max_iteration=40)  # type: ignore
 
             tensorboard: SummaryWriter = trainer.logger.experiment  # type: ignore
             

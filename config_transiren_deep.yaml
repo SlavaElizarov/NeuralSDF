@@ -9,16 +9,16 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.transformer.TransSiren
     init_args: 
       in_features: 3
-      hidden_features: 512
-      hidden_layers: 6
+      hidden_features: 256
+      hidden_layers: 8
       out_features: 1
       outermost_linear: True
       first_omega_0: 50.
-      hidden_omega_0: 30.
-      use_geometric_initialization: False
+      hidden_omega_0: 60.
+      initializationType: SIREN_NORMAL
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
