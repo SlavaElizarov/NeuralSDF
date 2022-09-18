@@ -136,8 +136,7 @@ class SdfExperiment(pl.LightningModule):
             # a = a[torch.abs(sdf_output) < 0.01]
             # offsurface_loss = torch.exp(-self.kernel_coefficient * a).mean()
             
-            # отжиг ядра, делай уже блэдь
-            # блэдь
+            # TODO: Consider kernel size anealing 
             # offsurface_loss = torch.exp(-(self.kernel_coefficient * sdf_output) ** 2 +0.001).mean()
 
             # soft_delta = 2 / (torch.pi*(4 + sdf_output**2))
