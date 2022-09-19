@@ -75,8 +75,7 @@ class MeshDataset(Dataset):
         return self.vertices.shape[0]
     
     def __getitem__(self, idx):
-        if self.steps_til_resample == 0:
-            print('==============Resampling================')
+        if self.steps_til_resample <= 0:
             self.set_vertices_and_normals()
             self.add_random_points()
         

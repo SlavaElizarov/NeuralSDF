@@ -41,6 +41,7 @@ class ImplicitAttetionLayer(nn.Module):
         self.input_dim = input_dim
         self.attention_dim = attention_dim
 
+        # TODO: Do ypu need to project keys? Looks pretty fixed
         self.keys_projections = torch.nn.ModuleList([nn.Linear(input_dim, attention_dim) for _ in range(n_heads)])
         self.values_projections = torch.nn.ModuleList(
             [values_projection_factory(input_dim, output_dim, i) for i in range(n_heads)]

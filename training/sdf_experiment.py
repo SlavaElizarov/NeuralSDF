@@ -156,9 +156,9 @@ class SdfExperiment(pl.LightningModule):
     
     # TODO: decouple dataset from experiment, add paprameters to config
     def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=1.0, device='cpu')
+        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=2.0, device='cpu')
         return DataLoader(mesh_dataset, batch_size=self.batch_size,
                           shuffle=True, 
                           pin_memory=True, 
                           num_workers=4,
-                          persistent_workers = True)
+                          persistent_workers = False)
