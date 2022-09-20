@@ -2,7 +2,7 @@ from enum import Enum
 
 from torch import nn
 import numpy as np
-from models.attention import ImplicitAttetionLayer
+from models.attention import ImplicitAttetionLayer, ImplicitAttetionLayerLite
 
 from models.sdf import SDF
 from models.siren import SinActivation, SirenLayer
@@ -13,6 +13,9 @@ class InitializationType(Enum):
     SIREN_NORMAL = 2
     HE_UNIFORM = 3
 
+class AttentionType(Enum):
+    FULL = 1
+    LITE = 2
 
 class SirenLinear(SirenLayer):
     def __init__(
@@ -22,7 +25,7 @@ class SirenLinear(SirenLayer):
         bias: bool = True,
         is_first: bool = False,
         omega_0: float = 30,
-        initializationType=InitializationType.SIREN_UNIFORM,
+        initializationType:InitializationType=InitializationType.SIREN_UNIFORM,
     ):
         self.initializationType = initializationType
         super().__init__(in_features, out_features, bias, is_first, omega_0)
@@ -51,20 +54,25 @@ class TransSiren(nn.Sequential, SDF):
         outermost_linear=False,
         first_omega_0=30,
         hidden_omega_0=30.0,
-        initializationType=InitializationType.SIREN_UNIFORM,
+        initializationType:InitializationType=InitializationType.SIREN_UNIFORM,
+        attention_type: AttentionType= AttentionType.FULL,
     ):
         super().__init__()
         
         if isinstance(initializationType, str):
             initializationType = InitializationType[initializationType]
+        if isinstance(attention_type, str):
+            attention_type = AttentionType[attention_type]
 
         layers = []
         layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
+        
+        attention_layer = ImplicitAttetionLayer if attention_type == AttentionType.FULL else ImplicitAttetionLayerLite
 
         for i in range(hidden_layers):
             layers.append(
-                ImplicitAttetionLayer(
-                    n_heads=(i + 1) * 2,
+                attention_layer(
+                    n_heads=(i + 1) * 2, #2**(i+1),#(i + 1) * 2
                     input_dim=hidden_features,
                     output_dim=hidden_features,
                     values_projection_factory=lambda _in, _out, _: SirenLinear(
