@@ -320,4 +320,50 @@ class Siren(nn.Sequential, SDF):
 #     def forward(self, x: torch.Tensor) -> torch.Tensor:
 #         return torch.exp(-x**2/(2*self.a**2))
 
+class SelfModulatedSiren(SDF):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_features: int,
+        hidden_layers: int,
+        out_features: int,
+        first_omega_0=30,
+        hidden_omega_0=30.0,
+    ):
+        super().__init__()
+
+        layers = []
+        modulations = []
+        layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
+        modulations.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
+
+        for _ in range(hidden_layers):
+            layers.append(
+                SirenLayer(
+                    hidden_features,
+                    hidden_features,
+                    is_first=False,
+                    omega_0=hidden_omega_0,
+                )
+            )
+            modulations.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
+
+            
+        self.siren_layers = nn.ModuleList(layers)
+        self.modulations = nn.ParameterList(modulations)
+
+        self.final_linear = nn.Linear(hidden_features, out_features)
+
+        nn.init.uniform_(
+            self.final_linear.weight,
+            -np.sqrt(6 / hidden_features) / hidden_omega_0,
+            np.sqrt(6 / hidden_features) / hidden_omega_0,
+        )
+
+        
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for layer, modulation in zip(self.siren_layers, self.modulations):
+            x = layer(x, modulation)
+        return self.final_linear(x)
 
