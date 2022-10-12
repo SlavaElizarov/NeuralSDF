@@ -1,10 +1,65 @@
-from typing import Callable
+from turtle import forward
+from typing import Callable, Optional, Tuple
 
 import torch
 from torch import nn
 import numpy as np
 
 
+class CrossAttentionLayer(nn.Module):
+    def __init__(self,
+                 first_input_dim: int,
+                 second_input_dim: int,
+                 attention_dim: int = 64,
+                 number_of_heads: int = 8,
+                 value_dim: Optional[int] = None,
+                 use_dropout: bool = False,
+                 drop_rate: float = 0.1) -> None:
+        super().__init__()
+        if value_dim is None:
+            value_dim = attention_dim
+            
+        self.attention_dim = attention_dim
+        self.number_of_heads = number_of_heads
+        self.use_dropout = use_dropout
+        self.value_dim = value_dim
+        
+        
+        self.query_projection = nn.Linear(first_input_dim, attention_dim * number_of_heads)
+        self.key_projection = nn.Linear(second_input_dim, attention_dim * number_of_heads)
+        self.value_projection = nn.Linear(second_input_dim, value_dim * number_of_heads)
+        
+        if use_dropout:
+            self.dropout = nn.Dropout(drop_rate)
+        
+    def separate_heads(self, x: torch.Tensor) -> torch.Tensor:
+        old_shape = x.shape
+        feature_dim = old_shape[-1] // self.number_of_heads
+        new_shape = old_shape[:-1] + (self.number_of_heads, feature_dim)
+        return x.view(*new_shape)
+        
+    def forward(self, x, y) -> Tuple[torch.Tensor, torch.Tensor]:
+        if len(x.shape) == 2:
+            x = x.unsqueeze(1)
+            
+        query = self.query_projection(x)
+        query = self.separate_heads(query)
+        key = self.separate_heads(self.key_projection(y))
+        value = self.separate_heads(self.value_projection(y))
+        
+        scores = torch.einsum('b n h d, b m h d -> b h n m', query, key) # (batch_size, num_heads, query_length, key_length)
+        scores = scores / np.sqrt(self.attention_dim)
+        
+        attention = torch.softmax(scores, dim=-1)
+        
+        if self.use_dropout:
+            self.dropout(attention)
+
+        out = torch.einsum('b h n m, b m h d -> b n h d', attention, value) # (batch_size, query_length, num_heads, value_dim)
+        
+        return out, attention
+        
+        
 class ImplicitAttetionLayer(nn.Module):
     def __init__(
         self,
@@ -65,7 +120,7 @@ class ImplicitAttetionLayer(nn.Module):
 
         attention = torch.softmax(attention_dot, dim=-1)  # (batch_size, n_heads)
 
-        return torch.einsum("bh,boh->bo", attention, values)  # (batch_size, output_dim)
+        return torch.einsum("bh,boh->bo", attention, values), attention  # (batch_size, output_dim)
     
 class ImplicitAttetionLayerLite(nn.Module):
     def __init__(
@@ -124,5 +179,5 @@ class ImplicitAttetionLayerLite(nn.Module):
 
         attention = torch.softmax(attention_dot, dim=-1)  # (batch_size, n_heads)
 
-        return torch.einsum("bh,boh->bo", attention, values)  # (batch_size, output_dim)
+        return torch.einsum("bh,boh->bo", attention, values), attention  # (batch_size, output_dim)
     

@@ -9,16 +9,14 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.siren.SelfModulatedSiren
     init_args: 
       in_features: 3
       hidden_features: 256
-      hidden_layers: 4
+      hidden_layers: 6
       out_features: 1
-      outermost_linear: True
-      first_omega_0: 50.
-      hidden_omega_0: 60.
-      use_geometric_initialization: False
+      first_omega_0: 300.
+      hidden_omega_0: 300.
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
@@ -38,13 +36,15 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 30.0
+  offsurface_loss_weight: 5.0
 
-  divergence_loss_weight: 0.005
+  divergence_loss_weight: 0.01
 
-  learning_rate: 0.00003
+  learning_rate: 0.0005
 
   kernel_coefficient: 100
+
+  learning_rate_decay: 0.98
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
@@ -110,7 +110,7 @@ trainer:
   # -1 no tracking. Otherwise tracks that p-norm. May be set to 'inf' infinity-norm. If using
   # Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
   # Default: ``-1``. (type: Union[int, float, str], default: -1)
-  track_grad_norm: -1
+  track_grad_norm: 2
 
   # Perform a validation loop every after every `N` training epochs. If ``None``,
   # validation will be done solely based on the number of training batches, requiring ``val_check_interval``

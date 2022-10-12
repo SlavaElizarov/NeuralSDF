@@ -2,6 +2,7 @@ from typing import Optional
 import torch
 from torch import nn
 import numpy as np
+from models.attention import CrossAttentionLayer
 
 from models.sdf import SDF
 
@@ -158,8 +159,8 @@ class Siren(nn.Sequential, SDF):
         hidden_layers: int,
         out_features: int,
         outermost_linear=False,
-        first_omega_0=30,
-        hidden_omega_0=30.0,
+        first_omega_0:float=30.0,
+        hidden_omega_0:float=30.0,
         use_geometric_initialization=False,
     ):
         """
@@ -311,14 +312,6 @@ class Siren(nn.Sequential, SDF):
         self[-3].linear.apply(second_last_layer_geom_sine_init)
         self[-2].apply(last_layer_geom_sine_init)
         
-        
-# class GaussianActivation(nn.Module):
-#     def __init__(self, a=1., trainable=True):
-#         super().__init__()
-#         self.register_parameter('a', nn.parameter.Parameter(a*torch.ones(1), trainable))
-
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         return torch.exp(-x**2/(2*self.a**2))
 
 class SelfModulatedSiren(SDF):
     def __init__(
@@ -333,9 +326,13 @@ class SelfModulatedSiren(SDF):
         super().__init__()
 
         layers = []
-        modulations = []
+        amplitide_mod = []
+        frequency_mod = []
+        
         layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
-        modulations.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
+        amplitide_mod.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
+        frequency_mod.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
+
 
         for _ in range(hidden_layers):
             layers.append(
@@ -346,11 +343,14 @@ class SelfModulatedSiren(SDF):
                     omega_0=hidden_omega_0,
                 )
             )
-            modulations.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
+            amplitide_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
+            frequency_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
 
             
         self.siren_layers = nn.ModuleList(layers)
-        self.modulations = nn.ParameterList(modulations)
+        self.amplitide_mod = nn.ParameterList(amplitide_mod)
+        self.frequency_mod = nn.ParameterList(frequency_mod)
+
 
         self.final_linear = nn.Linear(hidden_features, out_features)
 
@@ -363,7 +363,148 @@ class SelfModulatedSiren(SDF):
         
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for layer, modulation in zip(self.siren_layers, self.modulations):
-            x = layer(x, modulation)
+        for layer, amp, freq in zip(self.siren_layers, self.amplitide_mod, self.frequency_mod):
+            # x = layer(x, torch.abs(modulation))
+            x = layer(x, scale = freq) * amp
         return self.final_linear(x)
 
+
+class ModulatedSiren(SDF):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_features: int,
+        hidden_layers: int,
+        out_features: int,
+        first_omega_0:float=30,
+        hidden_omega_0:float=30.0,
+        latent_size:int=128,
+    ):
+        super().__init__()
+        
+        self.latent_size = latent_size
+        layers = []
+        projections = []
+        layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
+        projections.append(nn.Linear(latent_size, hidden_features))
+
+        for _ in range(hidden_layers):
+            layers.append(
+                SirenLayer(
+                    hidden_features,
+                    hidden_features,
+                    is_first=False,
+                    omega_0=hidden_omega_0,
+                )
+            )
+            projections.append(nn.Linear(latent_size, hidden_features))
+
+            
+        self.siren_layers = nn.ModuleList(layers)
+        self.projections = nn.ModuleList(projections)
+
+        self.final_linear = nn.Linear(hidden_features, out_features)
+
+        nn.init.uniform_(
+            self.final_linear.weight,
+            -np.sqrt(6 / hidden_features) / hidden_omega_0,
+            np.sqrt(6 / hidden_features) / hidden_omega_0,
+        )
+
+        
+    def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        for layer, projection in zip(self.siren_layers, self.projections):
+            x = layer(x) * projection(z)
+        return self.final_linear(x)
+    
+class TransposedAttentionSiren(Siren):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_features: int,
+        hidden_layers: int,
+        out_features: int,
+        first_omega_0:float=30.,
+        hidden_omega_0:float=30.0,
+        codebook_size:int = 64,
+        use_dropout:bool = True,
+        attention_dim: int = 64, 
+        
+    ): 
+        super().__init__(in_features, 
+                         hidden_features, 
+                         hidden_layers, 
+                         out_features, 
+                         True,
+                         first_omega_0, 
+                         hidden_omega_0)
+        self.hidden_layers = hidden_layers
+        self.attention = CrossAttentionLayer(first_input_dim=hidden_features, 
+                                             second_input_dim=hidden_features,
+                                             attention_dim=attention_dim,
+                                             number_of_heads=hidden_layers + 1,
+                                             value_dim=hidden_features,
+                                             use_dropout=use_dropout)
+        self.latent = nn.Parameter(torch.randn((1, codebook_size, hidden_features), dtype=torch.float32))
+        
+        frequency_mod = []
+        for _ in range(hidden_layers + 1):
+            frequency_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
+        self.frequency_mod = nn.ParameterList(frequency_mod)    
+        
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self[0](x, scale=self.frequency_mod[0])
+        modulations, attentin_scores = self.attention(x, self.latent)
+        x = x * modulations[:, 0, 0, :]
+        
+        for i in range(1, self.hidden_layers + 1):
+            x = self[i](x, scale=self.frequency_mod[i])
+            x = x * modulations[:, 0, i, :]
+
+        return self[self.hidden_layers + 1](x)
+    
+
+class CodebookModulatedSiren(SDF):
+    def __init__(self,
+        in_features: int,
+        hidden_features: int,
+        hidden_layers: int,
+        out_features: int,
+        first_omega_0:float=30,
+        hidden_omega_0:float=30.0,
+        codebook_dim: int = 64,
+        codebook_size: int = 32,
+        number_of_heads: int = 8,
+        head_size: int = 64):
+        super().__init__()
+        
+        self.latent = nn.Parameter(torch.randn((1, codebook_size, codebook_dim), dtype=torch.float32))
+        # nn.init.orthogonal_(self.latent)
+        self.attention_layer = CrossAttentionLayer(hidden_features, codebook_dim, number_of_heads, head_size, use_dropout=False)
+        latent_size = number_of_heads * head_size
+        self.modulated_siren = ModulatedSiren(in_features, hidden_features, hidden_layers, out_features, first_omega_0, hidden_omega_0, latent_size)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        
+        siren_layers = self.modulated_siren.siren_layers 
+        projections = self.modulated_siren.projections
+        final_linear = self.modulated_siren.final_linear
+        
+        embedding = siren_layers[0](x)
+
+        latent, attention_scores = self.attention_layer(embedding, self.latent)
+        latent = latent.flatten(1)
+        mod = projections[0](latent)
+        x = embedding * mod
+        
+        for i, (layer, projection) in enumerate(zip(siren_layers, projections)):
+            if i == 0:
+                continue
+            x = layer(x) * projection(latent)
+        
+        # embedding = self.embedding_layer(x)
+        # mod, attention_scores = self.attention_layer(embedding, self.latent)
+        # mod = mod.flatten(1)
+        return final_linear(x)
+        
