@@ -93,6 +93,7 @@ class SirenLayer(nn.Module):
             biasInitScheme (SirenBiasInitScheme, optional): For PFA preferably to use Normal init. Defaults to SirenBiasInitScheme.ZEROS.
             modulationType (SirenModulationType, optional): FILM or PFA, see description for details. Defaults to SirenModulationType.FILM.
             disable_activation (bool, optional): Make layer linear, this option is specific for some architectures. Defaults to False.
+            self_modulate (Set[ModulateArg], optional): Add learnable vectors as modulation. Defaults to {}.
         """
         super().__init__()
         self.omega_0 = omega_0
@@ -111,27 +112,36 @@ class SirenLayer(nn.Module):
             and add_bias
             and modulation_type == modulation_type.PFA
         ):
-            ValueError("PFA is already self-modulated by bias")
+            ValueError("If PFA is on, phase is already self-modulated by bias")
+            
         assert not (
-            ModulateArg.Amplitude in self_modulate and disable_activation
+            ModulateArg.Amplitude in self_modulate 
+            and disable_activation
         ), "Can't self-modulate amplitude without activation"
 
         self.linear = nn.Linear(input_dim, output_dim, bias=False)
         if add_bias:
-            self.bias = nn.Parameter(torch.zeros(output_dim))
-
+            self.bias = nn.Parameter(torch.zeros(output_dim), requires_grad=True)
+        
+        # Self-modulation parameters
         self.scale = None
         self.amplitude = None
         self.shift = None
         if ModulateArg.Frequency in self_modulate:
-            self.scale = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32))
+            self.scale = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
         if ModulateArg.Amplitude in self_modulate:
-            self.amplitude = nn.Parameter(
-                torch.randn((1, output_dim), dtype=torch.float32)
-            )
+            self.amplitude = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
         if ModulateArg.Phase in self_modulate:
-            self.shift = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32))
-
+            self.shift = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
+            
+        # Choosing forward implementation depending on modulation type
+        if self.modulationType == SirenModulationType.FILM:
+            self._forward = self._forward_film
+        elif self.modulationType == SirenModulationType.PFA:
+            self._forward = self._forward_pfa
+        else:
+            raise NotImplementedError("Unknown modulationType")
+        
         self._init_weights()
 
     def forward(
@@ -144,21 +154,21 @@ class SirenLayer(nn.Module):
         Apply Siren layer to input.
         Scale and shift are optional parameters which are used to modulate the output of the layer.
 
-        y = sin(omega_0 * ((Wx + b) * scale + shift))
-
-        So, scale and shift should modulate frequency and amplitude of the output signal.
-
-        But final formula looks like this:
-        Or y = sin(omega_0 * (Wx * scale + b * scale + shift))  strange, isn't?
-        # TODO: Investigate modulation more thorougly.
-
+        1) If FILM is used: 
+            y = sin(omega_0 * ((Wx + b) * scale + shift))
+        2) If PFA is used:
+            y = sin((omega_0 * scale) * Wx + (b + shift))
+            
+        If self_modulate is enabled for frequency, amplitude or phase,
+        First, the layer is modulated by learned vectors and then external modulation is applied.
+        
         Args:
-            x (torch.Tensor): _description_
+            x (torch.Tensor): input tensor
             scale (Optional[torch.Tensor], optional): Scale. Defaults to None.
             shift (Optional[torch.Tensor], optional): Shift. Defaults to None.
 
         Returns:
-            torch.Tensor: _description_
+            torch.Tensor: output tensor
         """
 
         if scale is None:
@@ -171,12 +181,7 @@ class SirenLayer(nn.Module):
         elif self.shift is not None:
             shift = shift + self.shift
 
-        if self.modulationType == SirenModulationType.FILM:
-            y = self._forward_film(x, scale, shift)
-        elif self.modulationType == SirenModulationType.PFA:
-            y = self._forward_pfa(x, scale, shift)
-        else:
-            raise NotImplementedError("Unknown modulationType")
+        y = self._forward(x, scale, shift)
 
         return y if self.amplitude is None else y * self.amplitude
 
@@ -211,7 +216,7 @@ class SirenLayer(nn.Module):
             raise NotImplementedError("Unknown initScheme")
         if self.add_bias:
             if self.biasInitScheme == SirenBiasInitScheme.NORMAL:
-                torch.nn.init.normal_(self.bias, mean=0.0, std=torch.pi / 2)
+                torch.nn.init.normal_(self.bias, mean=0.0, std=torch.pi / 3)
             elif self.biasInitScheme != SirenBiasInitScheme.ZEROS:
                 raise NotImplementedError("Unknown biasInitScheme")
 

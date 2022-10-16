@@ -1,2 +1,2 @@
-from attention import *
-from siren import *
+from .attention import *
+from .siren import *

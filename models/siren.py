@@ -61,9 +61,14 @@ class Siren(nn.Sequential, SDF):
                     The main idea is to start from SDF of a sphere.
                     For details check https://arxiv.org/abs/2106.10811
                     Defaults to False.
+            modulation_type (SirenModulationType, optional): Modulation type. For details see SirenLayer.
+                    Defaults to SirenModulationType.FILM.
+            bias_init_scheme (SirenBiasInitScheme, optional): Bias initialization scheme. 
+                    For details see SirenLayer. 
+                    Defaults to SirenBiasInitScheme.ZEROS.
+            self_modulate (Set[ModulateArg], optional): Self modulation arguments. Defaults to set().
         """
         super().__init__()
-
         layers = []
 
         for i in range(hidden_layers):
@@ -103,7 +108,7 @@ class Siren(nn.Sequential, SDF):
             len(self) >= 5
         ), "Geometric initialization is only applicable for a network with at least 5 layers"
         # shamelessly copied from https://github.com/Chumbyte/DiGS/blob/main/models/DiGS.py
-        # TODO: refactor it, God bless a soul who will do it
+        # TODO: refactor it, God bless a soul of one who will do that
         # TODO: Consider deleting this method, it does not work well anyway
         def geom_sine_init(m):
             with torch.no_grad():
@@ -224,8 +229,6 @@ class TransposedAttentionSiren(Siren):
         self_modulate: Set[ModulateArg] = set(),
         attention_modulate: Set[ModulateArg] = {
             ModulateArg.Amplitude,
-            ModulateArg.Phase,
-            ModulateArg.Frequency,
         },
     ):
         super().__init__(

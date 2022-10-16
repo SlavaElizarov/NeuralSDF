@@ -19,6 +19,8 @@ model:
       first_omega_0: 50.
       hidden_omega_0: 60.
       use_geometric_initialization: False
+      modulation_type: FILM
+      bias_init_scheme: NORMAL
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
@@ -40,11 +42,16 @@ model:
 
   offsurface_loss_weight: 30.0
 
+  offsurface_loss_margin: 0.0025
+
   divergence_loss_weight: 0.005
 
-  learning_rate: 0.00003
+  learning_rate: 0.00025
 
   kernel_coefficient: 100
+
+  learning_rate_decay: 0.97
+
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
@@ -63,7 +70,7 @@ trainer:
   # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.VisualizationCalback)
   callbacks: 
     - train_sdf.VisualizationCalback
-    # - train_sdf.ActivationDistributionCalback
+    - train_sdf.ActivationDistributionCalback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
 
@@ -110,7 +117,7 @@ trainer:
   # -1 no tracking. Otherwise tracks that p-norm. May be set to 'inf' infinity-norm. If using
   # Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
   # Default: ``-1``. (type: Union[int, float, str], default: -1)
-  track_grad_norm: -1
+  track_grad_norm: 2
 
   # Perform a validation loop every after every `N` training epochs. If ``None``,
   # validation will be done solely based on the number of training batches, requiring ``val_check_interval``
