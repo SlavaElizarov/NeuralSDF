@@ -6,7 +6,6 @@ from torch import autograd
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ExponentialLR
 from models.sdf import SDF
-from models.siren import SelfModulatedSiren
 
 from training.dataset import MeshDataset
 

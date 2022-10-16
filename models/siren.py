@@ -1,148 +1,26 @@
-from typing import Optional
+from enum import Enum
+from typing import Optional, Set
 import torch
 from torch import nn
 import numpy as np
-from models.attention import CrossAttentionLayer
+from layers import CrossAttentionLayer, SubtractionCrossAttentionLayer
+from layers import ModulateArg, SirenBiasInitScheme, SirenLayer, SirenModulationType
 
 from models.sdf import SDF
 
-class SinActivation(nn.Module):
-    def __init__(self, omega_0: float = 1.0):
-        """
-            Sin activation with scaling.
-            Paper: https://arxiv.org/abs/2006.09661
-        Args:
-            omega_0 (float, optional):  Omega_0 parameter from SIREN paper. Defaults to 1.0.
-        """
-        super().__init__()
-        assert omega_0 > 0
-        self.omega_0: float = omega_0
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.sin(self.omega_0 * x)
-
-
-class SirenLayer(nn.Module):
-    # See paper sec. 3.2, final paragraph, and supplement Sec. 1.5 for discussion of omega_0.
-
-    # If is_first=True, omega_0 is a frequency factor which simply multiplies the activations before the
-    # nonlinearity. Different signals may require different omega_0 in the first layer - this is a
-    # hyperparameter.
-
-    # If is_first=False, then the weights will be divided by omega_0 so as to keep the magnitude of
-    # activations constant, but boost gradients to the weight matrix (see supplement Sec. 1.5)
-
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        bias: bool = True,
-        is_first: bool = False,
-        omega_0: float = 30,
-    ):
-        """
-            Dense layer with sin activation.
-            Described in paper: https://arxiv.org/abs/2006.09661
-
-        Args:
-            in_features (int): Number of input features.
-            out_features (int): Number of output features.
-            bias (bool, optional): Use bias? Defaults to True.
-            is_first (bool, optional): Is first? Initialzation depends on this parameter.
-                                       See 3.2 of the paper. Defaults to False.
-            omega_0 (float, optional): omega_0 is a frequency factor which simply multiplies
-                                        the activations before the nonlinearity.
-                                        Different signals may require different omega_0 in the first layer.
-                                        Defaults to 30.
-        """
-        super().__init__()
-        self.omega_0 = omega_0
-        self.is_first = is_first
-
-        self.in_features = in_features
-        self.linear = nn.Linear(in_features, out_features, bias=bias)
-
-        self.init_weights()
-        self.activation = SinActivation(omega_0)
-
-    def init_weights(self):
-        if self.is_first:
-            nn.init.uniform_(self.linear.weight, -1 / self.in_features, 1 / self.in_features)
-        else:
-            nn.init.uniform_(
-                self.linear.weight,
-                -np.sqrt(6 / self.in_features) / self.omega_0,
-                np.sqrt(6 / self.in_features) / self.omega_0,
-            )
-
-    def forward(
-        self,
-        input: torch.Tensor,
-        scale: Optional[torch.Tensor] = None,
-        shift: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        y = self.linear(input)
-
-        if scale is not None:
-            y = y * scale
-
-        if shift is not None:
-            y = y + shift
-
-        return self.activation(y)
-
-
-class ModulatedSirenLayer(SirenLayer):
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        latent_size: int,
-        bias=True,
-        is_first=False,
-        omega_0: float = 30,
-        shift_only: bool = True,
-    ):
-        """
-            Modulated Siren layer described in paper: https://arxiv.org/abs/2201.12904
-
-        Args:
-            in_features (int): Number of input features.
-            out_features (int): Number of output features.
-            latent_size (int): Size of latent vector.
-            bias (bool, optional): Use bias? Defaults to True.
-            is_first (bool, optional): Is firts? Initialzation depends on this parameter.
-                                        See 3.2 of the paper. Defaults to False.
-            omega_0 (float, optional): omega_0 is a frequency factor which simply multiplies
-                                        the activations before the nonlinearity.
-                                        Different signals may require different omega_0 in the first layer.
-                                        Defaults to 30.
-            shift_only (bool, optional): Use shifts only for modulation.
-                                        It proved to be sufficient in https://arxiv.org/abs/2201.12904.
-                                        Defaults to True.
-        """
-        super().__init__(in_features, out_features, bias, is_first, omega_0)
-
-        self._shift_only = shift_only
-
-        if not self._shift_only:
-            self._latent2scale = nn.Linear(latent_size, out_features)
-
-        self._latent2shift = nn.Linear(latent_size, out_features)
-        nn.init.zeros_(self._latent2shift.bias)
-
-    def forward(self, x: torch.Tensor, latent: torch.Tensor) -> torch.Tensor:
-        shift = self._latent2shift(latent)
-        scale = None
-
-        if not self._shift_only:
-            scale = self._latent2scale(latent)
-
-        return super().forward(x, scale, shift)
+class AttentionType(Enum):
+    DOT = 1
+    SUBTRACTION = 2
 
 
 class SirenGeometricHead(nn.Module):
     def __init__(self) -> None:
+        """
+        Geometric head for Siren model.
+        Used to apply a geometric intialization from https://arxiv.org/abs/2106.10811
+        
+        Empirically it does not work well :(
+        """
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -150,25 +28,27 @@ class SirenGeometricHead(nn.Module):
         sdf_output -= 1.6
         return sdf_output
 
-
 class Siren(nn.Sequential, SDF):
     def __init__(
         self,
-        in_features: int,
-        hidden_features: int,
+        input_dim: int,
+        hidden_dim: int,
         hidden_layers: int,
         out_features: int,
-        outermost_linear=False,
-        first_omega_0:float=30.0,
-        hidden_omega_0:float=30.0,
-        use_geometric_initialization=False,
+        outermost_linear: bool =False,
+        first_omega_0:float = 30.0,
+        hidden_omega_0:float = 30.0,
+        use_geometric_initialization = False,
+        modulation_type: SirenModulationType = SirenModulationType.FILM,
+        bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
+        self_modulate: Set[ModulateArg] = set(),        
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
 
         Args:
-            in_features (int): Number of input features.
-            hidden_features (int): Number of hidden features.
+            input_dim (int): Number of input features.
+            hidden_dim (int): Number of hidden features.
             hidden_layers (int): Number of hidden layers.
             out_features (int): Number of output features.
             outermost_linear (bool, optional): Is final layer linear?. Defaults to False.
@@ -183,37 +63,30 @@ class Siren(nn.Sequential, SDF):
         super().__init__()
 
         layers = []
-        layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
 
-        for _ in range(hidden_layers):
+        for i in range(hidden_layers):
+            is_first = i == 0
             layers.append(
                 SirenLayer(
-                    hidden_features,
-                    hidden_features,
-                    is_first=False,
-                    omega_0=hidden_omega_0,
+                    input_dim if is_first else hidden_dim,
+                    hidden_dim,
+                    is_first = is_first,
+                    omega_0 = first_omega_0 if is_first else hidden_omega_0,
+                    modulation_type=modulation_type,
+                    bias_init_scheme=bias_init_scheme,
+                    self_modulate = self_modulate
                 )
             )
 
-        if outermost_linear:
-            final_linear = nn.Linear(hidden_features, out_features)
-
-            nn.init.uniform_(
-                final_linear.weight,
-                -np.sqrt(6 / hidden_features) / hidden_omega_0,
-                np.sqrt(6 / hidden_features) / hidden_omega_0,
+        layers.append(
+            SirenLayer(
+                hidden_dim,
+                out_features,
+                is_first=False,
+                omega_0=hidden_omega_0,
+                disable_activation = outermost_linear,
             )
-
-            layers.append(final_linear)
-        else:
-            layers.append(
-                SirenLayer(
-                    hidden_features,
-                    out_features,
-                    is_first=False,
-                    omega_0=hidden_omega_0,
-                )
-            )
+        )
 
         if use_geometric_initialization:
             layers.append(SirenGeometricHead())
@@ -226,7 +99,8 @@ class Siren(nn.Sequential, SDF):
     def geometric_init(self):
         assert len(self) >= 5, "Geometric initialization is only applicable for a network with at least 5 layers"
         # shamelessly copied from https://github.com/Chumbyte/DiGS/blob/main/models/DiGS.py
-        # TODO: refactor it 
+        # TODO: refactor it, God bless a soul who will do it
+        # TODO: Consider deleting this method, it does not work well anyway 
         def geom_sine_init(m):
             with torch.no_grad():
                 if hasattr(m, 'weight'):
@@ -312,199 +186,85 @@ class Siren(nn.Sequential, SDF):
         self[-3].linear.apply(second_last_layer_geom_sine_init)
         self[-2].apply(last_layer_geom_sine_init)
         
-
-class SelfModulatedSiren(SDF):
-    def __init__(
-        self,
-        in_features: int,
-        hidden_features: int,
-        hidden_layers: int,
-        out_features: int,
-        first_omega_0=30,
-        hidden_omega_0=30.0,
-    ):
-        super().__init__()
-
-        layers = []
-        amplitide_mod = []
-        frequency_mod = []
-        
-        layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
-        amplitide_mod.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
-        frequency_mod.append(nn.Parameter(torch.randn(size=(1, hidden_features), dtype=torch.float32)))
-
-
-        for _ in range(hidden_layers):
-            layers.append(
-                SirenLayer(
-                    hidden_features,
-                    hidden_features,
-                    is_first=False,
-                    omega_0=hidden_omega_0,
-                )
-            )
-            amplitide_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
-            frequency_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
-
-            
-        self.siren_layers = nn.ModuleList(layers)
-        self.amplitide_mod = nn.ParameterList(amplitide_mod)
-        self.frequency_mod = nn.ParameterList(frequency_mod)
-
-
-        self.final_linear = nn.Linear(hidden_features, out_features)
-
-        nn.init.uniform_(
-            self.final_linear.weight,
-            -np.sqrt(6 / hidden_features) / hidden_omega_0,
-            np.sqrt(6 / hidden_features) / hidden_omega_0,
-        )
-
-        
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for layer, amp, freq in zip(self.siren_layers, self.amplitide_mod, self.frequency_mod):
-            # x = layer(x, torch.abs(modulation))
-            x = layer(x, scale = freq) * amp
-        return self.final_linear(x)
-
-
-class ModulatedSiren(SDF):
-    def __init__(
-        self,
-        in_features: int,
-        hidden_features: int,
-        hidden_layers: int,
-        out_features: int,
-        first_omega_0:float=30,
-        hidden_omega_0:float=30.0,
-        latent_size:int=128,
-    ):
-        super().__init__()
-        
-        self.latent_size = latent_size
-        layers = []
-        projections = []
-        layers.append(SirenLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0))
-        projections.append(nn.Linear(latent_size, hidden_features))
-
-        for _ in range(hidden_layers):
-            layers.append(
-                SirenLayer(
-                    hidden_features,
-                    hidden_features,
-                    is_first=False,
-                    omega_0=hidden_omega_0,
-                )
-            )
-            projections.append(nn.Linear(latent_size, hidden_features))
-
-            
-        self.siren_layers = nn.ModuleList(layers)
-        self.projections = nn.ModuleList(projections)
-
-        self.final_linear = nn.Linear(hidden_features, out_features)
-
-        nn.init.uniform_(
-            self.final_linear.weight,
-            -np.sqrt(6 / hidden_features) / hidden_omega_0,
-            np.sqrt(6 / hidden_features) / hidden_omega_0,
-        )
-
-        
-    def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-        for layer, projection in zip(self.siren_layers, self.projections):
-            x = layer(x) * projection(z)
-        return self.final_linear(x)
     
 class TransposedAttentionSiren(Siren):
     def __init__(
         self,
-        in_features: int,
-        hidden_features: int,
+        input_dim: int,
+        hidden_dim: int,
         hidden_layers: int,
-        out_features: int,
+        output_dim: int,
         first_omega_0:float=30.,
         hidden_omega_0:float=30.0,
-        codebook_size:int = 64,
+        latent_seq_len:int = 64,
         use_dropout:bool = True,
         attention_dim: int = 64, 
-        
+        attention_type: AttentionType = AttentionType.DOT,
+        modulation_type: SirenModulationType = SirenModulationType.FILM,
+        bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
+        self_modulate: Set[ModulateArg] = set(),        
+        attention_modulate: Set[ModulateArg] = {ModulateArg.Amplitude, ModulateArg.Phase, ModulateArg.Frequency},
     ): 
-        super().__init__(in_features, 
-                         hidden_features, 
+        super().__init__(input_dim, 
+                         hidden_dim, 
                          hidden_layers, 
-                         out_features, 
+                         output_dim, 
                          True,
                          first_omega_0, 
-                         hidden_omega_0)
+                         hidden_omega_0,
+                         False,
+                         modulation_type,
+                         bias_init_scheme,
+                         self_modulate
+                         )
+        
+        assert len(attention_modulate) > 0, "Must modulate at least one parameter"
+        assert ModulateArg.Amplitude in attention_modulate, "this assert is temporary"
+        
         self.hidden_layers = hidden_layers
-        self.attention = CrossAttentionLayer(first_input_dim=hidden_features, 
-                                             second_input_dim=hidden_features,
-                                             attention_dim=attention_dim,
-                                             number_of_heads=hidden_layers + 1,
-                                             value_dim=hidden_features,
-                                             use_dropout=use_dropout)
-        self.latent = nn.Parameter(torch.randn((1, codebook_size, hidden_features), dtype=torch.float32))
+        self.modulate = attention_modulate
         
-        frequency_mod = []
-        for _ in range(hidden_layers + 1):
-            frequency_mod.append(nn.Parameter(torch.randn((1, hidden_features), dtype=torch.float32)))
-        self.frequency_mod = nn.ParameterList(frequency_mod)    
+        number_of_heads = (hidden_layers -1) * len(attention_modulate)
+        if ModulateArg.Amplitude in attention_modulate:
+            number_of_heads += 1
+        
+        attention_layer = CrossAttentionLayer if attention_type == AttentionType.DOT else SubtractionCrossAttentionLayer
+        
+        self.attention = nn.ModuleDict()
+        for modulate in attention_modulate:
+            number_of_heads = hidden_layers if modulate == ModulateArg.Amplitude else hidden_layers -1
+            self.attention[modulate.name] = attention_layer(first_input_dim=hidden_dim, 
+                                            second_input_dim=hidden_dim,
+                                            attention_dim=attention_dim,
+                                            number_of_heads=number_of_heads,
+                                            value_dim=hidden_dim,
+                                            use_dropout=use_dropout)
+        
+        self.latent = nn.Parameter(torch.randn((1, latent_seq_len, hidden_dim), dtype=torch.float32))
         
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self[0](x, scale=self.frequency_mod[0])
-        modulations, attentin_scores = self.attention(x, self.latent)
-        x = x * modulations[:, 0, 0, :]
+        x = self[0](x)
+                
+        modulation_dict = {key: layer(x) for key, layer in self.attention.items()}
         
-        for i in range(1, self.hidden_layers + 1):
-            x = self[i](x, scale=self.frequency_mod[i])
-            x = x * modulations[:, 0, i, :]
+        if ModulateArg.Amplitude in self.modulate:
+            x = x * modulation_dict[ModulateArg.Amplitude.name][:, 0, 0, :]
 
-        return self[self.hidden_layers + 1](x)
+        for i, layer in enumerate(self[1:]):
+            frequency_mod = None
+            if ModulateArg.Frequency in modulation_dict:
+                frequency_mod = modulation_dict[ModulateArg.Frequency][:, 0, i, :]
+                
+            phase_mod = None
+            if ModulateArg.Phase in modulation_dict:
+                phase_mod = modulation_dict[ModulateArg.Phase][:, 0, i, :]
+                
+            x = layer(x, scale=frequency_mod, shift=phase_mod)
+            
+            if ModulateArg.Amplitude in modulation_dict:
+                x = x * modulation_dict[ModulateArg.Amplitude][:, 0, i + 1, :]
+
+        return self[-1](x)
     
-
-class CodebookModulatedSiren(SDF):
-    def __init__(self,
-        in_features: int,
-        hidden_features: int,
-        hidden_layers: int,
-        out_features: int,
-        first_omega_0:float=30,
-        hidden_omega_0:float=30.0,
-        codebook_dim: int = 64,
-        codebook_size: int = 32,
-        number_of_heads: int = 8,
-        head_size: int = 64):
-        super().__init__()
-        
-        self.latent = nn.Parameter(torch.randn((1, codebook_size, codebook_dim), dtype=torch.float32))
-        # nn.init.orthogonal_(self.latent)
-        self.attention_layer = CrossAttentionLayer(hidden_features, codebook_dim, number_of_heads, head_size, use_dropout=False)
-        latent_size = number_of_heads * head_size
-        self.modulated_siren = ModulatedSiren(in_features, hidden_features, hidden_layers, out_features, first_omega_0, hidden_omega_0, latent_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        
-        siren_layers = self.modulated_siren.siren_layers 
-        projections = self.modulated_siren.projections
-        final_linear = self.modulated_siren.final_linear
-        
-        embedding = siren_layers[0](x)
-
-        latent, attention_scores = self.attention_layer(embedding, self.latent)
-        latent = latent.flatten(1)
-        mod = projections[0](latent)
-        x = embedding * mod
-        
-        for i, (layer, projection) in enumerate(zip(siren_layers, projections)):
-            if i == 0:
-                continue
-            x = layer(x) * projection(latent)
-        
-        # embedding = self.embedding_layer(x)
-        # mod, attention_scores = self.attention_layer(embedding, self.latent)
-        # mod = mod.flatten(1)
-        return final_linear(x)
         

@@ -11,10 +11,10 @@ model:
   sdf_model:
     class_path: models.siren.Siren
     init_args: 
-      in_features: 3
-      hidden_features: 256
+      input_dim: 3
+      hidden_dim: 256
       hidden_layers: 4
-      out_features: 1
+      output_dim: 1
       outermost_linear: True
       first_omega_0: 50.
       hidden_omega_0: 60.
