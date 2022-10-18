@@ -6,7 +6,7 @@ NeuralSDF is a library for reconstructing implicit 3D surface from meshes and po
 
 To train a model use the folowing command:
 
-```python train_sdf.py fit -c config.yaml```
+```python train_sdf.py fit -c configs/config.yaml```
 
 
 Following papers are implemented (partially):
