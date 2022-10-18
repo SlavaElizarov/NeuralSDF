@@ -1,7 +1,8 @@
+from typing import List
 from torch import nn
 import torch
 from layers import CommutatorAttetionLayer, SirenLayer
-from layers.siren import SirenBiasInitScheme, SirenInitScheme, SirenModulationType
+from layers.siren import ModulateArg, SirenBiasInitScheme, SirenInitScheme, SirenModulationType
 
 from models.sdf import SDF
 
@@ -17,7 +18,8 @@ class TransSiren(nn.Sequential, SDF):
         hidden_omega_0: float = 30.0,
         init_scheme: SirenInitScheme = SirenInitScheme.SIREN_UNIFORM,
         modulation_type: SirenModulationType = SirenModulationType.FILM,
-        bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
+        bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.HE_UNIFORM,
+        self_modulate: List[ModulateArg] = [],
     ):
         super().__init__()
 
@@ -26,9 +28,10 @@ class TransSiren(nn.Sequential, SDF):
             hidden_dim,
             is_first=True,
             omega_0=first_omega_0,
-            init_scheme=init_scheme,
+            init_scheme=SirenInitScheme.SIREN_UNIFORM,
             modulation_type=modulation_type,
             bias_init_scheme=bias_init_scheme,
+            self_modulate=self_modulate
         )
 
         attention_layers = []
@@ -47,6 +50,7 @@ class TransSiren(nn.Sequential, SDF):
                         modulation_type=modulation_type,
                         bias_init_scheme=bias_init_scheme,
                         disable_activation=True,
+                        self_modulate=self_modulate
                     ),
                 )
             )
@@ -58,7 +62,7 @@ class TransSiren(nn.Sequential, SDF):
     def forward(self, x):
         x = self.embedding_layer(x)
         for attention_layer in self.attention_layers:
-            x = attention_layer(x)
+            x, _ = attention_layer(x)
             x = torch.sin(x)
         x = self.final_linear(x)
         return x

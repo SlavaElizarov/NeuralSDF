@@ -1,7 +1,8 @@
 from enum import Enum
-from typing import Set
+from typing import List, Set, Tuple
 import torch
 from torch import nn
+from torch.nn.parameter import Parameter
 import numpy as np
 from layers import CrossAttentionLayer, SubtractionCrossAttentionLayer
 from layers import ModulateArg, SirenBiasInitScheme, SirenLayer, SirenModulationType
@@ -43,7 +44,7 @@ class Siren(nn.Sequential, SDF):
         use_geometric_initialization=False,
         modulation_type: SirenModulationType = SirenModulationType.FILM,
         bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
-        self_modulate: Set[ModulateArg] = set(),
+        self_modulate: List[ModulateArg] = [],
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
@@ -226,10 +227,8 @@ class TransposedAttentionSiren(Siren):
         attention_type: AttentionType = AttentionType.DOT,
         modulation_type: SirenModulationType = SirenModulationType.FILM,
         bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
-        self_modulate: Set[ModulateArg] = set(),
-        attention_modulate: Set[ModulateArg] = {
-            ModulateArg.Amplitude,
-        },
+        self_modulate: List[ModulateArg] = [],
+        attention_modulate: List[ModulateArg] = [ModulateArg.Amplitude],
     ):
         super().__init__(
             input_dim,
@@ -246,7 +245,6 @@ class TransposedAttentionSiren(Siren):
         )
 
         assert len(attention_modulate) > 0, "Must modulate at least one parameter"
-        assert ModulateArg.Amplitude in attention_modulate, "this assert is temporary"
 
         self.hidden_layers = hidden_layers
         self.modulate = attention_modulate
@@ -255,19 +253,19 @@ class TransposedAttentionSiren(Siren):
         if ModulateArg.Amplitude in attention_modulate:
             number_of_heads += 1
 
-        attention_layer = (
-            CrossAttentionLayer
-            if attention_type == AttentionType.DOT
-            else SubtractionCrossAttentionLayer
-        )
+        if attention_type == AttentionType.DOT:
+            attention_layer = CrossAttentionLayer
+        elif attention_type == AttentionType.SUBTRACTION:
+            attention_layer = SubtractionCrossAttentionLayer
+        else:
+            raise NotImplementedError("Attention type not implemented")
 
         self.attention = nn.ModuleDict()
         for modulate in attention_modulate:
-            number_of_heads = (
-                hidden_layers
-                if modulate == ModulateArg.Amplitude
-                else hidden_layers - 1
-            )
+            number_of_heads = hidden_layers - 1
+            if modulate == ModulateArg.Amplitude:
+                number_of_heads += 1
+            
             self.attention[modulate.name] = attention_layer(
                 first_input_dim=hidden_dim,
                 second_input_dim=hidden_dim,
@@ -277,30 +275,31 @@ class TransposedAttentionSiren(Siren):
                 use_dropout=use_dropout,
             )
 
-        self.latent = nn.Parameter(
-            torch.randn((1, latent_seq_len, hidden_dim), dtype=torch.float32)
+        self.latent = Parameter(
+            torch.randn((1, latent_seq_len, hidden_dim), dtype=torch.float32), requires_grad=True
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self[0](x)
 
-        modulation_dict = {key: layer(x) for key, layer in self.attention.items()}
+        modulation_dict = {key: layer(x, self.latent) for key, layer in self.attention.items()}
 
         if ModulateArg.Amplitude in self.modulate:
             x = x * modulation_dict[ModulateArg.Amplitude.name][:, 0, 0, :]
 
-        for i, layer in enumerate(self[1:]):
+        for i in range(1, self.hidden_layers):
+            layer = self[i]
             frequency_mod = None
-            if ModulateArg.Frequency in modulation_dict:
-                frequency_mod = modulation_dict[ModulateArg.Frequency][:, 0, i, :]
+            if ModulateArg.Frequency.name in modulation_dict:
+                frequency_mod = modulation_dict[ModulateArg.Frequency.name][:, 0, i - 1, :]
 
             phase_mod = None
-            if ModulateArg.Phase in modulation_dict:
-                phase_mod = modulation_dict[ModulateArg.Phase][:, 0, i, :]
+            if ModulateArg.Phase.name in modulation_dict:
+                phase_mod = modulation_dict[ModulateArg.Phase.name][:, 0, i - 1, :]
 
             x = layer(x, scale=frequency_mod, shift=phase_mod)
 
-            if ModulateArg.Amplitude in modulation_dict:
-                x = x * modulation_dict[ModulateArg.Amplitude][:, 0, i + 1, :]
+            if ModulateArg.Amplitude.name in modulation_dict:
+                x = x * modulation_dict[ModulateArg.Amplitude.name][:, 0, i, :]
 
-        return self[-1](x)
+        return self[self.hidden_layers](x)

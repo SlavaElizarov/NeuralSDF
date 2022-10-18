@@ -11,15 +11,17 @@ model:
   sdf_model:
     class_path: models.transformer.TransSiren
     init_args: 
-      in_features: 3
-      hidden_features: 256
-      hidden_layers: 4
-      out_features: 1
-      outermost_linear: True
+      input_dim: 3
+      hidden_dim: 256
+      hidden_layers: 5
+      output_dim: 1
       first_omega_0: 50.
       hidden_omega_0: 60.
-      initializationType: SIREN_NORMAL
-      attention_type: FULL
+      modulation_type: FILM
+      init_scheme: SIREN_NORMAL
+      bias_init_scheme: HE_UNIFORM
+      self_modulate: []
+
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
