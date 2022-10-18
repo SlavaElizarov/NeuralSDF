@@ -9,22 +9,30 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.transformer.TransSiren
+    class_path: models.siren.TransposedAttentionSiren
     init_args: 
-      in_features: 3
-      hidden_features: 256
-      hidden_layers: 8
-      out_features: 1
-      outermost_linear: True
-      first_omega_0: 50.
-      hidden_omega_0: 60.
-      initializationType: SIREN_NORMAL
+      input_dim: 3
+      hidden_dim: 128
+      hidden_layers: 5
+      output_dim: 1
+      first_omega_0: 128.
+      hidden_omega_0: 128.
+      latent_seq_len: 32
+      attention_dim: 64
+      use_dropout: false
+      attention_type: DOT
+      modulation_type: FILM
+      bias_init_scheme: HE_UNIFORM
+      self_modulate: [Frequency]
+      attention_modulate:
+        - Amplitude
+        - Phase
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
 
   #   (type: int, default: 1024)
-  batch_size: 6000
+  batch_size: 10000
 
   #   (type: float, default: 10)
   level_set_loss_weight: 100.0
@@ -38,13 +46,18 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 30.0
+  offsurface_loss_weight: 60.0
 
-  divergence_loss_weitht: 0.005
+  offsurface_loss_margin: 0.0025
 
-  learning_rate: 0.00003
+  divergence_loss_weight: 0.01
+
+  learning_rate: 0.0005
 
   kernel_coefficient: 100
+
+  learning_rate_decay: 0.97
+
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
@@ -63,6 +76,7 @@ trainer:
   # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.VisualizationCalback)
   callbacks: 
     - train_sdf.VisualizationCalback
+    - train_sdf.ActivationDistributionCalback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
 
@@ -109,7 +123,7 @@ trainer:
   # -1 no tracking. Otherwise tracks that p-norm. May be set to 'inf' infinity-norm. If using
   # Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
   # Default: ``-1``. (type: Union[int, float, str], default: -1)
-  track_grad_norm: -1
+  track_grad_norm: 2
 
   # Perform a validation loop every after every `N` training epochs. If ``None``,
   # validation will be done solely based on the number of training batches, requiring ``val_check_interval``

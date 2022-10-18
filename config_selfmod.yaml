@@ -13,14 +13,16 @@ model:
     init_args: 
       input_dim: 3
       hidden_dim: 256
-      hidden_layers: 4
+      hidden_layers: 6
       output_dim: 1
       outermost_linear: True
-      first_omega_0: 50.
-      hidden_omega_0: 60.
+      first_omega_0: 90.
+      hidden_omega_0: 90.
       use_geometric_initialization: False
-      modulation_type: FILM
+      modulation_type: PFA
       bias_init_scheme: NORMAL
+      self_modulate: [Frequency]
+
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
@@ -44,9 +46,9 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  divergence_loss_weight: 0.005
+  divergence_loss_weight: 0.01
 
-  learning_rate: 0.00025
+  learning_rate: 0.0001
 
   kernel_coefficient: 100
 

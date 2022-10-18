@@ -19,7 +19,7 @@ model:
       first_omega_0: 50.
       hidden_omega_0: 60.
       use_geometric_initialization: False
-      modulation_type: FILM
+      modulation_type: PFA
       bias_init_scheme: NORMAL
 
   #   (required, type: str)

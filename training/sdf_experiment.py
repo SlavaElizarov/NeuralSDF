@@ -6,7 +6,6 @@ from torch import autograd
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ExponentialLR
 from models.sdf import SDF
-from models.transformer import TransSiren
 
 from training.dataset import MeshDataset
 
@@ -21,7 +20,8 @@ class SdfExperiment(pl.LightningModule):
                  grad_direction_loss_weight: float = 1,
                  enforce_eikonality: bool = True,
                  offsurface_loss_weight: float = 0,
-                 divergence_loss_weitht: float = 0.001,
+                 offsurface_loss_margin: float = 0.0025,
+                 divergence_loss_weight: float = 0.001,
                  learning_rate: float = 0.00001,
                  learning_rate_decay: float = 0.94,
                  kernel_coefficient : float = 70,
@@ -49,7 +49,8 @@ class SdfExperiment(pl.LightningModule):
         self.grad_direction_loss_weight = grad_direction_loss_weight
         self.enforce_eikonality = enforce_eikonality
         self.offsurface_loss_weight = offsurface_loss_weight
-        self.divergence_loss_weitht = divergence_loss_weitht
+        self.divergence_loss_weight = divergence_loss_weight
+        self.offsurface_loss_margin = offsurface_loss_margin
         self.mesh_path = mesh_path # it's a bit of an antipatern to have this here TODO: decouple data from experiment
         self.batch_size = batch_size
         self.learning_rate = learning_rate
@@ -62,7 +63,7 @@ class SdfExperiment(pl.LightningModule):
         """ 
             Can be overrided in config
         """
-        optimizer = torch.optim.AdamW(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
+        optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=True)
         scheduler = ExponentialLR(optimizer, gamma=self.learning_rate_decay)
         return  [optimizer], [scheduler]
         
@@ -126,16 +127,16 @@ class SdfExperiment(pl.LightningModule):
         loss = level_set_loss * self.level_set_loss_weight + \
                 eikonal_loss * self.eikonal_loss_weight + \
                 grad_direction_loss * self.grad_direction_loss_weight + \
-                divergence_loss * self.divergence_loss_weitht
+                divergence_loss * self.divergence_loss_weight
         
         # there is a big problem with this loss. There is no garauntee that random points are off the surface.
         if self.offsurface_loss_weight > 0:
             # TODO: careful analysis of this loss is required
-            offsurface_loss_plus = (F.relu(0.0015 - F.relu(sdf_output)) * 100).mean()
-            # offsurface_loss_minus = (F.relu(0.003 - F.relu(sdf_output * -1)) * 10).mean()
+            offsurface_loss_plus = (F.relu(self.offsurface_loss_margin * 2 - F.relu(sdf_output + self.offsurface_loss_margin)) * 100).mean()
+            # offsurface_loss_minus = (F.relu(sdf_output * -1) * 100).mean()
             offsurface_loss = offsurface_loss_plus #+ offsurface_loss_minus
             # a = a[torch.abs(sdf_output) < 0.01]
-            # offsurface_loss = torch.exp(-self.kernel_coefficient * a).mean()
+            # offsurface_loss = torch.exp(-(sdf_output / 0.02)**2).mean()
             
             # TODO: Consider kernel size anealing 
             # offsurface_loss = torch.exp(-(self.kernel_coefficient * sdf_output) ** 2 +0.001).mean()
@@ -145,6 +146,13 @@ class SdfExperiment(pl.LightningModule):
             loss += offsurface_loss * self.offsurface_loss_weight
             
             self.log('offsurface_loss', offsurface_loss, prog_bar=True)
+        
+        # if isinstance(self.sdf_model, SelfModulatedSiren):
+        #     tensorboard: SummaryWriter = self.trainer.logger.experiment  # type: ignore
+        #     for i, amp in enumerate(self.sdf_model.amplitide_mod):
+        #         tensorboard.add_histogram(f'amplitide_mod_{i}', amp, global_step=self.global_step)
+        #     for i, frq in enumerate(self.sdf_model.frequency_mod):
+        #         tensorboard.add_histogram(f'frequency_mod_{i}', frq, global_step=self.global_step)
 
                 
         self.log('level_set_loss', level_set_loss, prog_bar=True)
@@ -156,9 +164,30 @@ class SdfExperiment(pl.LightningModule):
     
     # TODO: decouple dataset from experiment, add paprameters to config
     def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=2.0, device='cpu')
+        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=3.0, device='cpu')
         return DataLoader(mesh_dataset, batch_size=self.batch_size,
                           shuffle=True, 
                           pin_memory=True, 
                           num_workers=4,
                           persistent_workers = False)
+        
+    # learning rate warm-up
+    def optimizer_step(
+        self,
+        epoch,
+        batch_idx,
+        optimizer,
+        optimizer_idx,
+        optimizer_closure,
+        on_tpu=False,
+        using_native_amp=False,
+        using_lbfgs=False,
+    ):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # skip the first 500 steps
+        if self.trainer.global_step < 300:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / 300.0)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.learning_rate
