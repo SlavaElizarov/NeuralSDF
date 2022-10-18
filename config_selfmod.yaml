@@ -13,11 +13,11 @@ model:
     init_args: 
       input_dim: 3
       hidden_dim: 256
-      hidden_layers: 4
+      hidden_layers: 6
       output_dim: 1
       outermost_linear: True
-      first_omega_0: 256.
-      hidden_omega_0: 256.
+      first_omega_0: 90.
+      hidden_omega_0: 90.
       use_geometric_initialization: False
       modulation_type: PFA
       bias_init_scheme: NORMAL

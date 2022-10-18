@@ -1,8 +1,9 @@
-from audioop import add
 from enum import Enum
-from typing import Optional, Set
+from typing import List, Optional, Set, Tuple
 import torch
 from torch import nn
+import torch.nn.functional as F
+from torch.nn.parameter import Parameter
 import numpy as np
 
 
@@ -15,6 +16,7 @@ class SirenInitScheme(Enum):
 class SirenBiasInitScheme(Enum):
     NORMAL = 1
     ZEROS = 2
+    HE_UNIFORM = 3
 
 
 class SirenModulationType(Enum):
@@ -23,12 +25,12 @@ class SirenModulationType(Enum):
 
 
 class ModulateArg(Enum):
-    Amplitude = (0,)
-    Frequency = (1,)
+    Amplitude = 0
+    Frequency = 1
     Phase = 2
 
 
-class SirenLayer(nn.Module):
+class SirenLayer(nn.Linear):
     def __init__(
         self,
         input_dim: int,
@@ -40,7 +42,9 @@ class SirenLayer(nn.Module):
         bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.ZEROS,
         modulation_type: SirenModulationType = SirenModulationType.FILM,
         disable_activation: bool = False,
-        self_modulate: Set[ModulateArg] = set(),
+        self_modulate: List[ModulateArg] = [],
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
     ):
         """Siren layer.
 
@@ -95,7 +99,13 @@ class SirenLayer(nn.Module):
             disable_activation (bool, optional): Make layer linear, this option is specific for some architectures. Defaults to False.
             self_modulate (Set[ModulateArg], optional): Add learnable vectors as modulation. Defaults to {}.
         """
-        super().__init__()
+        super().__init__(
+            in_features=input_dim,
+            out_features=output_dim,
+            bias=add_bias,
+            device=device,
+            dtype=dtype,
+        )
         self.omega_0 = omega_0
         self.is_first = is_first
         self.input_dim = input_dim
@@ -118,21 +128,18 @@ class SirenLayer(nn.Module):
             ModulateArg.Amplitude in self_modulate 
             and disable_activation
         ), "Can't self-modulate amplitude without activation"
-
-        self.linear = nn.Linear(input_dim, output_dim, bias=False)
-        if add_bias:
-            self.bias = nn.Parameter(torch.zeros(output_dim), requires_grad=True)
         
         # Self-modulation parameters
         self.scale = None
         self.amplitude = None
         self.shift = None
         if ModulateArg.Frequency in self_modulate:
-            self.scale = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
+            self.scale = Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
         if ModulateArg.Amplitude in self_modulate:
-            self.amplitude = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
+            self.amplitude = Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
         if ModulateArg.Phase in self_modulate:
-            self.shift = nn.Parameter(torch.randn((1, output_dim), dtype=torch.float32), requires_grad=True)
+            phase_init = torch.randn((1, output_dim), dtype=torch.float32) * torch.pi / 3
+            self.shift = Parameter(phase_init, requires_grad=True)
             
         # Choosing forward implementation depending on modulation type
         if self.modulationType == SirenModulationType.FILM:
@@ -188,11 +195,11 @@ class SirenLayer(nn.Module):
     def _init_siren_uniform(self):
         if self.is_first:
             nn.init.uniform_(
-                self.linear.weight, -1 / self.input_dim, 1 / self.input_dim
+                self.weight, -1 / self.input_dim, 1 / self.input_dim
             )
         else:
             nn.init.uniform_(
-                self.linear.weight,
+                self.weight,
                 -np.sqrt(6 / self.input_dim) / self.omega_0,
                 np.sqrt(6 / self.input_dim) / self.omega_0,
             )
@@ -204,7 +211,7 @@ class SirenLayer(nn.Module):
             )  # TODO: can be?
         else:
             nn.init.normal_(
-                self.linear.weight, 0, np.sqrt(2 / self.input_dim) / self.omega_0
+                self.weight, 0, np.sqrt(2 / self.input_dim) / self.omega_0
             )
 
     def _init_weights(self):
@@ -212,12 +219,18 @@ class SirenLayer(nn.Module):
             self._init_siren_uniform()
         elif self.initScheme == SirenInitScheme.SIREN_NORMAL:
             self._init_siren_normal()
+        elif self.initScheme == SirenInitScheme.HE_UNIFORM:
+            pass # Linear layer is already initialized with He, see super().__init__
         else:
             raise NotImplementedError("Unknown initScheme")
         if self.add_bias:
             if self.biasInitScheme == SirenBiasInitScheme.NORMAL:
                 torch.nn.init.normal_(self.bias, mean=0.0, std=torch.pi / 3)
-            elif self.biasInitScheme != SirenBiasInitScheme.ZEROS:
+            elif self.biasInitScheme == SirenBiasInitScheme.ZEROS:
+                torch.nn.init.zeros_(self.bias)
+            elif self.biasInitScheme == SirenBiasInitScheme.HE_UNIFORM:
+                pass # Bias of linear layer is already initialized with He, see super().__init__
+            else:
                 raise NotImplementedError("Unknown biasInitScheme")
 
     def _forward_film(
@@ -226,11 +239,8 @@ class SirenLayer(nn.Module):
         scale: Optional[torch.Tensor] = None,
         shift: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        y = self.linear(x)
-
-        if self.add_bias:
-            y = y + self.bias
-
+        y = F.linear(x, self.weight, self.bias)
+        
         if scale is not None:
             y = y * scale
 
@@ -248,7 +258,7 @@ class SirenLayer(nn.Module):
         scale: Optional[torch.Tensor] = None,
         shift: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        y = self.linear(x) * self.omega_0
+        y = F.linear(x, self.weight) * self.omega_0
 
         if scale is not None:
             y = y * scale

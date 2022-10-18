@@ -11,15 +11,22 @@ model:
   sdf_model:
     class_path: models.siren.TransposedAttentionSiren
     init_args: 
-      in_features: 3
-      hidden_features: 256
+      input_dim: 3
+      hidden_dim: 128
       hidden_layers: 5
-      out_features: 1
-      first_omega_0: 256.
-      hidden_omega_0: 256.
-      codebook_size: 32
+      output_dim: 1
+      first_omega_0: 128.
+      hidden_omega_0: 128.
+      latent_seq_len: 32
       attention_dim: 64
       use_dropout: false
+      attention_type: DOT
+      modulation_type: FILM
+      bias_init_scheme: HE_UNIFORM
+      self_modulate: [Frequency]
+      attention_modulate:
+        - Amplitude
+        - Phase
 
   #   (required, type: str)
   mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
@@ -39,7 +46,7 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 60
+  offsurface_loss_weight: 60.0
 
   offsurface_loss_margin: 0.0025
 
@@ -50,6 +57,7 @@ model:
   kernel_coefficient: 100
 
   learning_rate_decay: 0.97
+
 
 # Path/URL of the checkpoint from which training is resumed. If there is
 # no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
@@ -135,7 +143,7 @@ trainer:
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
   # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
-  max_epochs: 200
+  max_epochs: 128
 
   # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
   min_epochs:
