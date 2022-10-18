@@ -25,7 +25,7 @@ model:
 
 
   #   (required, type: str)
-  mesh_path: /home/duke/Documents/artefacts/3d_models/frazer-nash-super-sport-1929.obj
+  mesh_path: data/frazer-nash-super-sport-1929.obj
 
   #   (type: int, default: 1024)
   batch_size: 10000
