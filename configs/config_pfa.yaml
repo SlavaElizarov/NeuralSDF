@@ -9,24 +9,18 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.TransposedAttentionSiren
+    class_path: models.siren.Siren
     init_args: 
       input_dim: 3
-      hidden_dim: 128
-      hidden_layers: 5
+      hidden_dim: 256
+      hidden_layers: 4
       output_dim: 1
-      first_omega_0: 128.
-      hidden_omega_0: 128.
-      latent_seq_len: 32
-      attention_dim: 64
-      use_dropout: false
-      attention_type: DOT
-      modulation_type: FILM
-      bias_init_scheme: HE_UNIFORM
-      self_modulate: [Frequency]
-      attention_modulate:
-        - Amplitude
-        - Phase
+      outermost_linear: True
+      first_omega_0: 50.
+      hidden_omega_0: 60.
+      use_geometric_initialization: False
+      modulation_type: PFA
+      bias_init_scheme: NORMAL
 
   #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
@@ -46,13 +40,13 @@ model:
   #   (type: bool, default: True)
   enforce_eikonality: true
 
-  offsurface_loss_weight: 60.0
+  offsurface_loss_weight: 30.0
 
   offsurface_loss_margin: 0.0025
 
-  divergence_loss_weight: 0.01
+  divergence_loss_weight: 0.005
 
-  learning_rate: 0.0005
+  learning_rate: 0.00025
 
   kernel_coefficient: 100
 
