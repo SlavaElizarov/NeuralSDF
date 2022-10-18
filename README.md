@@ -23,4 +23,6 @@ TODO:
 * [ ] Improve rendering speed
 * [ ] Implement poisson disk sampling
 * [ ] Implement BACON
+* [ ] Implement [Critical Regularizations for Neural Surface Reconstruction in the Wild](https://arxiv.org/abs/2206.03087)
+* [ ] Implement [Learning Deep Implicit Functions for 3D Shapes with Dynamic Code Clouds](https://arxiv.org/abs/2203.14048)
 * [ ] Investigate bias initialization for PFA modulation method
