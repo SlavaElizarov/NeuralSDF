@@ -18,6 +18,9 @@ Following papers are implemented (partially):
 * [Sphere Tracing: A Geometric Method for the Antialiased Ray Tracing of Implicit Surfaces](https://graphics.stanford.edu/courses/cs348b-20-spring-content/uploads/hart.pdf)
 
 TODO:
+* [ ] Implement PSNR metric 
+* [ ] Add Fourier spectrum visualization
+* [ ] Improve rendering speed
 * [ ] Implement poisson disk sampling
 * [ ] Implement BACON
-* [ ] Add Fourier spectrum visualization 
+* [ ] Investigate bias initialization for PFA modulation method
