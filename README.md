@@ -23,7 +23,7 @@ TODO:
 * [ ] Implement PSNR metric 
 * [ ] Add Fourier spectrum visualization
 * [ ] Improve rendering speed
-* [ ] Implement poisson disk sampling
+* [ ] Implement poisson disk sampling. [Fast Poisson Disk Sampling in Arbitrary Dimensions](https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf)
 * [ ] Implement BACON
 * [ ] Implement ground truth SDF supervision
 * [ ] Implement [Critical Regularizations for Neural Surface Reconstruction in the Wild](https://arxiv.org/abs/2206.03087)
