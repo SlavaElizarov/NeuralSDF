@@ -16,6 +16,8 @@ Following papers are implemented (partially):
 * [Modulated Periodic Activations for Generalizable Local Functional Representations](https://arxiv.org/abs/2104.03960)
 * [Implicit geometric regularization for learning shapes](https://arxiv.org/abs/2002.10099)
 * [Sphere Tracing: A Geometric Method for the Antialiased Ray Tracing of Implicit Surfaces](https://graphics.stanford.edu/courses/cs348b-20-spring-content/uploads/hart.pdf)
+* Subtraction-based attention from [Point Transformer
+](https://arxiv.org/abs/2012.09164) [Code](layers/attention.py)
 
 TODO:
 * [ ] Implement PSNR metric 
