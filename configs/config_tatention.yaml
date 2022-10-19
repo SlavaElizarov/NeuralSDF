@@ -21,15 +21,13 @@ model:
       attention_dim: 64
       use_dropout: false
       attention_type: DOT
-      modulation_type: FILM
+      modulation_type: PFA
       bias_init_scheme: HE_UNIFORM
       self_modulate: [Frequency]
       attention_modulate:
         - Amplitude
         - Phase
-        - Frequency
 
-  #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
 
   #   (type: int, default: 1024)
@@ -44,18 +42,19 @@ model:
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
 
-  #   (type: bool, default: True)
-  enforce_eikonality: true
-
-  offsurface_loss_weight: 60.0
+  offsurface_loss_weight: 30.0
 
   offsurface_loss_margin: 0.0025
 
-  divergence_loss_weight: 0.01
+  high_order_loss_weight: 0.0 #0.01
 
-  learning_rate: 0.0005
+  high_order_loss_type: Div
 
-  kernel_coefficient: 100
+  apply_high_order_loss_to: OffSurface
+
+  learning_rate: 0.00025
+
+  lr_warmup_steps: 300
 
   learning_rate_decay: 0.97
 

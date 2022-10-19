@@ -77,8 +77,10 @@ class SdfExperiment(pl.LightningModule):
         # TODO: consider using a more sophisticated sampling method 
         offsurface_points = self._sample_offsurface_points(batch_size)
         
+        surface_points.requires_grad_(True) 
+        offsurface_points.requires_grad_(True)
+        
         points = torch.cat([surface_points, offsurface_points], dim=0)
-        points.requires_grad_(True) 
         
         distances = self.sdf_model(points)
         surface_distances = distances[:batch_size]
@@ -110,13 +112,16 @@ class SdfExperiment(pl.LightningModule):
         # Unfortunately, losses above are not enough to make distance field smooth and consistent
         if self.high_order_loss_weight > 0:
             # it depends on the type of the loss to which points it should be applied
-            target_grad = gradient 
+            target_grad = gradient
+            target_points = points
             if self.apply_high_order_loss_to == ApplyHOLossTo.Surface:
                 target_grad = gradient[:batch_size]
+                target_points = surface_points
             elif self.apply_high_order_loss_to == ApplyHOLossTo.OffSurface:
                 target_grad = gradient[batch_size:]
+                target_points = offsurface_points
                 
-            high_order_loss = self._high_order_loss(target_grad, points)
+            high_order_loss = self._high_order_loss(target_grad, target_points)
             loss = loss + self.high_order_loss_weight * high_order_loss
             self.log('high_order_loss', high_order_loss, prog_bar=True)
             
@@ -175,8 +180,8 @@ class SdfExperiment(pl.LightningModule):
         https://arxiv.org/pdf/2106.10811
 
         Args:
-            points (torch.Tensor): points where the gradient is computed
             gradient (torch.Tensor): gradient of the SDF at the points
+            points (torch.Tensor): points where the gradient is computed
 
         Returns:
             torch.Tensor: abs value of the divergence
@@ -188,7 +193,7 @@ class SdfExperiment(pl.LightningModule):
         div = dx[:, 0] + dy[:, 1] + dz[:, 2]
         return torch.abs(div).mean()
         
-    def _hessian_loss(self, points: torch.Tensor, gradient: torch.Tensor) -> torch.Tensor:
+    def _hessian_loss(self, gradient: torch.Tensor, points: torch.Tensor) -> torch.Tensor:
         """
         Hessian loss
         
@@ -200,8 +205,8 @@ class SdfExperiment(pl.LightningModule):
         https://arxiv.org/abs/2206.03087
 
         Args:
-            points (torch.Tensor): points where the gradient is computed
             gradient (torch.Tensor): gradient of the SDF at the points
+            points (torch.Tensor): points where the gradient is computed
 
         Returns:
             torch.Tensor: element-wise matrix 1-norm of the Hessian matrix

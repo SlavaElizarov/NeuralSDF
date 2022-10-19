@@ -42,11 +42,11 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  high_order_loss_weight: 0.0 #0.005
+  high_order_loss_weight: 0.0 # 0.01
 
   high_order_loss_type: Div
 
-  apply_high_order_loss_to: Both
+  apply_high_order_loss_to: OffSurface
 
   learning_rate: 0.00025
 
