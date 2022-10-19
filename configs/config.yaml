@@ -20,7 +20,8 @@ model:
       hidden_omega_0: 60.
       use_geometric_initialization: False
       modulation_type: FILM
-      bias_init_scheme: NORMAL
+      bias_init_scheme: HE_UNIFORM
+      self_modulate: []
 
   #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
@@ -37,18 +38,19 @@ model:
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
 
-  #   (type: bool, default: True)
-  enforce_eikonality: true
-
   offsurface_loss_weight: 30.0
 
   offsurface_loss_margin: 0.0025
 
-  divergence_loss_weight: 0.005
+  high_order_loss_weight: 0.0 #0.005
+
+  high_order_loss_type: Div
+
+  apply_high_order_loss_to: Both
 
   learning_rate: 0.00025
 
-  kernel_coefficient: 100
+  lr_warmup_steps: 300
 
   learning_rate_decay: 0.97
 
