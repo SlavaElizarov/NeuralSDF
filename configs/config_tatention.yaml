@@ -26,7 +26,6 @@ model:
       self_modulate: [Frequency]
       attention_modulate:
         - Amplitude
-        - Phase
 
   mesh_path: data/frazer-nash-super-sport-1929.obj
 
@@ -46,7 +45,7 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  high_order_loss_weight: 0.0 #0.01
+  high_order_loss_weight: 0.005
 
   high_order_loss_type: Div
 
