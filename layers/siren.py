@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -11,6 +11,7 @@ class SirenInitScheme(Enum):
     SIREN_UNIFORM = 1
     SIREN_NORMAL = 2
     HE_UNIFORM = 3
+    SIREN_LOGNORMAL = 4
 
 
 class SirenBiasInitScheme(Enum):
@@ -116,7 +117,6 @@ class SirenLayer(nn.Linear):
         self.modulationType = modulation_type
         self.disable_activation = disable_activation
         self.self_modulate = self_modulate
-
         if (
             ModulateArg.Phase in self_modulate
             and add_bias
@@ -191,9 +191,9 @@ class SirenLayer(nn.Linear):
         y = self._forward(x, scale, shift)
 
         return y if self.amplitude is None else y * self.amplitude
-
+    
     def _init_siren_uniform(self):
-        if self.is_first:
+        if self.is_first:            
             nn.init.uniform_(
                 self.weight, -1 / self.input_dim, 1 / self.input_dim
             )
@@ -206,13 +206,19 @@ class SirenLayer(nn.Linear):
 
     def _init_siren_normal(self):
         if self.is_first:
-            raise ValueError(
-                "SirenNormal can't be used for first layer"
-            )  # TODO: can be?
+            nn.init.normal_(self.weight, 0, 1 / np.sqrt(3) / self.input_dim)
         else:
             nn.init.normal_(
                 self.weight, 0, np.sqrt(2 / self.input_dim) / self.omega_0
             )
+
+    def _init_siren_lognormal(self):
+        if self.is_first:
+            with torch.no_grad():
+                self.weight = self.weight.log_normal_(std=2)
+                self.weight /= self.omega_0
+        else:
+            raise NotImplementedError("SIREN_LOGNORMAL is not implemented for non-first layers")
 
     def _init_weights(self):
         if self.initScheme == SirenInitScheme.SIREN_UNIFORM:

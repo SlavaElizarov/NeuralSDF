@@ -35,6 +35,7 @@ class SdfExperiment(pl.LightningModule):
                  learning_rate: float = 0.00001,
                  learning_rate_decay: float = 0.94,
                  lr_warmup_steps : int = 300,
+                 random_points_per_vertex: int = 3,
                  ):
         super().__init__()
         
@@ -53,6 +54,7 @@ class SdfExperiment(pl.LightningModule):
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
         self.lr_warmup_steps = lr_warmup_steps
+        self.random_points_per_vertex = random_points_per_vertex
         
         self.random_sampler = torch.distributions.uniform.Uniform(torch.tensor([-1.1]), torch.tensor([1.1]))
 
@@ -225,7 +227,7 @@ class SdfExperiment(pl.LightningModule):
     
     # TODO: decouple dataset from experiment, add paprameters to config
     def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=3.0, device='cpu')
+        mesh_dataset = MeshDataset(self.mesh_path, frac_points_to_sample=self.random_points_per_vertex, device='cpu')
         return DataLoader(mesh_dataset, batch_size=self.batch_size,
                           shuffle=True, 
                           pin_memory=True, 

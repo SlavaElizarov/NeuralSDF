@@ -51,14 +51,14 @@ class SphereTracingRenderer:
 
                 if not condition.any():
                     break
-
-        hit_points = points[is_hit].clone()
-        hit_points.requires_grad_(True)
-        d = sdf(hit_points)
-        (gradient,) = autograd.grad(outputs=d.sum(), inputs=hit_points)
-
         frame = torch.zeros_like(points)
-        frame[is_hit] = (
-            gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
-        ) * 0.5 + 0.5
+        if is_hit.any():
+            hit_points = points[is_hit].clone()
+            hit_points.requires_grad_(True)
+            d = sdf(hit_points)
+            (gradient,) = autograd.grad(outputs=d.sum(), inputs=hit_points)
+
+            frame[is_hit] = (
+                gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
+            ) * 0.5 + 0.5
         return frame.reshape(self.camera.height, self.camera.width, 3)

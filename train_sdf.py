@@ -27,16 +27,17 @@ class VisualizationCalback(pl.Callback):
 
         camera = Camera(dist, elev, azim, resolution=256, device=device)
         rend = SphereTracingRenderer(
-            camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.002
+            camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
         )
         frame = rend.render(get_distance).detach()
         return frame
 
     def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
-        frame_front = self.render(model.sdf_model, dist=1.3, elev=0, azim=0, device=model.device, max_iteration=40)  # type: ignore
-        frame_back = self.render(model.sdf_model, dist=1.3, elev=0, azim=180, device=model.device, max_iteration=40)  # type: ignore
-        frame_side = self.render(model.sdf_model, dist=1.3, elev=0, azim=90, device=model.device, max_iteration=40)  # type: ignore
-        frame_top = self.render(model.sdf_model, dist=1.3, elev=90, azim=0, device=model.device, max_iteration=40)  # type: ignore
+        sdf_model = model.sdf_model
+        frame_front = self.render(sdf_model, dist=1.3, elev=0, azim=0, device=model.device, max_iteration=40)  # type: ignore
+        frame_back = self.render(sdf_model, dist=1.3, elev=0, azim=180, device=model.device, max_iteration=40)  # type: ignore
+        frame_side = self.render(sdf_model, dist=1.3, elev=0, azim=90, device=model.device, max_iteration=40)  # type: ignore
+        frame_top = self.render(sdf_model, dist=1.3, elev=90, azim=0, device=model.device, max_iteration=40)  # type: ignore
 
         tensorboard: SummaryWriter = trainer.logger.experiment  # type: ignore
 
