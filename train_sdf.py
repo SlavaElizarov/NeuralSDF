@@ -50,7 +50,8 @@ class VisualizationCalback(pl.Callback):
 
 
 class ActivationDistributionCalback(pl.Callback):
-    def __init__(self, log_every_n_batches: int = 30, number_of_samples: int = 16):
+    def __init__(self, log_every_n_batches: int = 30, 
+                 number_of_samples: int = 16):
         self.log_every_n_batches = log_every_n_batches
         self.number_of_samples = number_of_samples
 
@@ -76,6 +77,26 @@ class ActivationDistributionCalback(pl.Callback):
         for name, module in experiment.sdf_model.named_modules():
             hook = hook_wrapper(name, trainer)
             module.register_forward_hook(hook)
+            
+class SirenFrequencyCalback(pl.Callback):
+    def __init__(self, log_every_n_batches: int = 30, 
+                 number_of_samples: int = 64):
+        self.log_every_n_batches = log_every_n_batches
+        self.number_of_samples = number_of_samples
+        
+    def on_train_batch_end(self, trainer: pl.Trainer, pl_module: SdfExperiment, outputs, batch, batch_idx: int) -> None:
+        if trainer.global_step % self.log_every_n_batches != 0:
+            return
+        tensorboard: SummaryWriter = trainer.logger.experiment
+        
+        freq = pl_module.sdf_model[0].weight.detach().norm(dim=-1, keepdim=False)
+        tensorboard.add_histogram(
+                    f"Siren freq",
+                    freq[: self.number_of_samples],
+                    global_step=trainer.global_step,
+                )
+            
+
 
 
 if __name__ == "__main__":
