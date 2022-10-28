@@ -216,7 +216,9 @@ class SirenLayer(nn.Linear):
         if self.is_first:
             # TODO: make std configurable, or calculate the optimal one
             with torch.no_grad():
+                out, _ = self.weight.shape
                 self.weight = self.weight.log_normal_(std=2.2)
+                self.weight[:out//2] *= -1
                 self.weight /= self.omega_0
         else:
             # TODO: I decided to use uniform init for the rest of the layers, not sure if it's correct
