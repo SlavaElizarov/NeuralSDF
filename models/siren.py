@@ -12,6 +12,7 @@ from layers import (
     SirenLayer,
     SirenModulationType,
 )
+from layers.complex_siren import CESLayer
 
 from models.sdf import SDF
 
@@ -52,6 +53,7 @@ class Siren(nn.Sequential, SDF):
         bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.HE_UNIFORM,
         self_modulate: List[ModulateArg] = [],
         init_scheme: SirenInitScheme = SirenInitScheme.SIREN_UNIFORM,
+        freeze_layers: bool = False
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
@@ -113,9 +115,7 @@ class Siren(nn.Sequential, SDF):
             self.geometric_init()
 
     def geometric_init(self):
-        assert (
-            len(self) >= 5
-        ), "Geometric initialization is only applicable for a network with at least 5 layers"
+        assert len(self) >= 5, "Geometric initialization is only applicable for a network with at least 5 layers"
         # shamelessly copied from https://github.com/Chumbyte/DiGS/blob/main/models/DiGS.py
         # TODO: refactor it, God bless a soul of one who will do that
         # TODO: Consider deleting this method, it does not work well anyway
@@ -133,9 +133,7 @@ class Siren(nn.Sequential, SDF):
                 if hasattr(m, "weight"):
                     num_output = m.weight.size(0)
                     assert m.weight.shape == (num_output, num_output)
-                    m.weight.data = 0.5 * np.pi * torch.eye(
-                        num_output
-                    ) + 0.001 * torch.randn(num_output, num_output)
+                    m.weight.data = 0.5 * np.pi * torch.eye(num_output) + 0.001 * torch.randn(num_output, num_output)
                     m.bias.data = (
                         0.5
                         * np.pi
@@ -154,9 +152,7 @@ class Siren(nn.Sequential, SDF):
                     assert m.weight.shape == (1, num_input)
                     assert m.bias.shape == (1,)
                     # m.weight.data = -1 * torch.ones(1, num_input) + 0.001 * torch.randn(num_input)
-                    m.weight.data = -1 * torch.ones(
-                        1, num_input
-                    ) + 0.00001 * torch.randn(num_input)
+                    m.weight.data = -1 * torch.ones(1, num_input) + 0.00001 * torch.randn(num_input)
                     m.bias.data = torch.zeros(1) + num_input
 
         # ################################# multi frequency geometric initialization ###################################
@@ -196,20 +192,14 @@ class Siren(nn.Sequential, SDF):
                 if hasattr(m, "weight"):
                     num_input = m.weight.size(-1)
                     assert m.weight.shape == (num_input, num_input)
-                    num_per_period = (portion_per_period * num_input).astype(
-                        int
-                    )  # Number of values per section/period
+                    num_per_period = (portion_per_period * num_input).astype(int)  # Number of values per section/period
                     k = num_per_period[0]  # the portion that only hits the first period
                     # W1_new = torch.zeros(num_input, num_input).uniform_(-np.sqrt(3 / num_input), np.sqrt(3 / num_input) / 30) * 0.00001
                     W1_new = (
-                        torch.zeros(num_input, num_input).uniform_(
-                            -np.sqrt(3 / num_input), np.sqrt(3 / num_input) / 30
-                        )
+                        torch.zeros(num_input, num_input).uniform_(-np.sqrt(3 / num_input), np.sqrt(3 / num_input) / 30)
                         * 0.0005
                     )
-                    W1_new_1 = torch.zeros(k, k).uniform_(
-                        -np.sqrt(3 / num_input) / 30, np.sqrt(3 / num_input) / 30
-                    )
+                    W1_new_1 = torch.zeros(k, k).uniform_(-np.sqrt(3 / num_input) / 30, np.sqrt(3 / num_input) / 30)
                     W1_new[:k, :k] = W1_new_1
                     m.weight.data = W1_new
 
@@ -291,9 +281,7 @@ class TransposedAttentionSiren(Siren):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self[0](x)
 
-        modulation_dict = {
-            key: layer(x, self.latent) for key, layer in self.attention.items()
-        }
+        modulation_dict = {key: layer(x, self.latent) for key, layer in self.attention.items()}
 
         if ModulateArg.Amplitude in self.modulate:
             x = x * modulation_dict[ModulateArg.Amplitude.name][:, 0, 0, :]
@@ -314,3 +302,38 @@ class TransposedAttentionSiren(Siren):
                 x = x * modulation_dict[ModulateArg.Amplitude.name][:, 0, i, :]
 
         return self[self.hidden_layers](x)
+
+
+class ComplexSiren(Siren):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        hidden_layers: int,
+        output_dim: int,
+        outermost_linear: bool = False,
+        first_omega_0: float = 30.0,
+        hidden_omega_0: float = 30.0,
+        use_geometric_initialization=False,
+        modulation_type: SirenModulationType = SirenModulationType.FILM,
+        bias_init_scheme: SirenBiasInitScheme = SirenBiasInitScheme.HE_UNIFORM,
+        self_modulate: List[ModulateArg] = [],
+        init_scheme: SirenInitScheme = SirenInitScheme.SIREN_UNIFORM,
+    ):
+        super().__init__(
+            input_dim,
+            hidden_dim,
+            hidden_layers,
+            output_dim,
+            outermost_linear,
+            first_omega_0,
+            hidden_omega_0,
+            use_geometric_initialization,
+            modulation_type,
+            bias_init_scheme,
+            self_modulate,
+            init_scheme,
+        )
+        
+        first_layer = CESLayer(input_dim=input_dim, output_dim=hidden_dim, omega_0=first_omega_0, init_scheme =init_scheme)
+        self[0] = first_layer

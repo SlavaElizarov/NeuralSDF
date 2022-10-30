@@ -4,6 +4,7 @@ from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
 from pytorch_lightning.cli import LightningCLI
 import pytorch_lightning as pl
+from models.siren import ComplexSiren, Siren
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
 
@@ -89,12 +90,18 @@ class SirenFrequencyCalback(pl.Callback):
             return
         tensorboard: SummaryWriter = trainer.logger.experiment
         
-        freq = pl_module.sdf_model[0].weight.detach().norm(dim=-1, keepdim=False)
+        if isinstance(pl_module.sdf_model, ComplexSiren):
+            freq = pl_module.sdf_model[0].complex_weight.detach().angle()
+        elif isinstance(pl_module.sdf_model, Siren):
+            freq = pl_module.sdf_model[0].weight.detach().norm(dim=-1, keepdim=False)
+        else:
+            return
+        
         tensorboard.add_histogram(
-                    f"Siren freq",
-                    freq[: self.number_of_samples],
-                    global_step=trainer.global_step,
-                )
+                "frequencies",
+                freq[:self.number_of_samples],
+                global_step=trainer.global_step,
+            )
             
 
 
