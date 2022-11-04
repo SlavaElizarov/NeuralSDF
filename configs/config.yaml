@@ -20,17 +20,16 @@ model:
     class_path: models.siren.Siren
     init_args: 
       input_dim: 3
-      hidden_dim: 128
-      hidden_layers: 6
+      hidden_dim: 256
+      hidden_layers: 4
       output_dim: 1
-      # outermost_linear: True
-      first_omega_0: 30.
-      hidden_omega_0: 30.
-      # use_geometric_initialization: False
+      outermost_linear: True
+      first_omega_0: 50.
+      hidden_omega_0: 60.
+      use_geometric_initialization: False
       modulation_type: FILM
       bias_init_scheme: HE_UNIFORM
       self_modulate: []
-      init_scheme: SIREN_UNIFORM
 
   #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
@@ -51,17 +50,17 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  high_order_loss_weight: 0 #0.005
+  high_order_loss_weight: 0.0
 
   high_order_loss_type: Div
 
   apply_high_order_loss_to: OffSurface
 
-  learning_rate: 0.00015
+  learning_rate: 0.00025
 
-  learning_rate_decay: 0.96
+  learning_rate_decay: 0.97
 
-  lr_warmup_steps: 400
+  lr_warmup_steps: 300
 
 
 # Path/URL of the checkpoint from which training is resumed. If there is
@@ -84,7 +83,7 @@ trainer:
     - train_sdf.ActivationDistributionCalback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
-    - train_sdf.SirenFrequencyCalback
+    # - train_sdf.SirenFrequencyCalback
 
   # Default path for logs and weights when no logger/ckpt_callback passed.
   # Default: ``os.getcwd()``.
