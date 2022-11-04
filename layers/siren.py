@@ -214,17 +214,27 @@ class SirenLayer(nn.Linear):
 
     def _init_siren_lognormal(self):
         if self.is_first:
+            # TODO: make std configurable, or calculate the optimal one
             with torch.no_grad():
-                self.weight = self.weight.log_normal_(std=2)
+                out, _ = self.weight.shape
+                self.weight = self.weight.log_normal_(std=2.2)
+                self.weight[:out//2] *= -1
                 self.weight /= self.omega_0
         else:
-            raise NotImplementedError("SIREN_LOGNORMAL is not implemented for non-first layers")
+            # TODO: I decided to use uniform init for the rest of the layers, not sure if it's correct
+            nn.init.uniform_(
+                self.weight,
+                -np.sqrt(6 / self.input_dim) / self.omega_0,
+                np.sqrt(6 / self.input_dim) / self.omega_0,
+            )
 
     def _init_weights(self):
         if self.initScheme == SirenInitScheme.SIREN_UNIFORM:
             self._init_siren_uniform()
         elif self.initScheme == SirenInitScheme.SIREN_NORMAL:
             self._init_siren_normal()
+        elif self.initScheme == SirenInitScheme.SIREN_LOGNORMAL:
+            self._init_siren_lognormal()
         elif self.initScheme == SirenInitScheme.HE_UNIFORM:
             pass # Linear layer is already initialized with He, see super().__init__
         else:

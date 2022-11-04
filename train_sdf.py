@@ -4,6 +4,7 @@ from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
 from pytorch_lightning.cli import LightningCLI
 import pytorch_lightning as pl
+from models.siren import ComplexSiren, Siren
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
 
@@ -26,9 +27,7 @@ class VisualizationCalback(pl.Callback):
     ):
 
         camera = Camera(dist, elev, azim, resolution=256, device=device)
-        rend = SphereTracingRenderer(
-            camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
-        )
+        rend = SphereTracingRenderer(camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001)
         frame = rend.render(get_distance).detach()
         return frame
 
@@ -44,9 +43,7 @@ class VisualizationCalback(pl.Callback):
         col1 = torch.cat([frame_front, frame_back], dim=0)
         col2 = torch.cat([frame_side, frame_top], dim=0)
         grid = torch.cat([col1, col2], dim=1)
-        tensorboard.add_image(
-            "images", grid, dataformats="HWC", global_step=trainer.global_step
-        )
+        tensorboard.add_image("images", grid, dataformats="HWC", global_step=trainer.global_step)
 
 
 class ActivationDistributionCalback(pl.Callback):
@@ -58,9 +55,7 @@ class ActivationDistributionCalback(pl.Callback):
         tensorboard: SummaryWriter = trainer.logger.experiment  # type: ignore
 
         def hook_wrapper(name: str, trainer: pl.Trainer):
-            def hook(
-                module: nn.Module, input: torch.Tensor, output: torch.Tensor
-            ) -> None:
+            def hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor) -> None:
                 if trainer.global_step % self.log_every_n_batches != 0:
                     return
                 if isinstance(output, tuple):
@@ -76,6 +71,38 @@ class ActivationDistributionCalback(pl.Callback):
         for name, module in experiment.sdf_model.named_modules():
             hook = hook_wrapper(name, trainer)
             module.register_forward_hook(hook)
+
+
+class SirenFrequencyCalback(pl.Callback):
+    def __init__(self, log_every_n_batches: int = 30, number_of_samples: int = 64):
+        """
+        Visualize the frequency distribution of the first layer of the Siren model.
+        Works only for Siren and ComplexSiren models.
+
+        Args:
+            log_every_n_batches (int, optional): write every b batches. Defaults to 30.
+            number_of_samples (int, optional): how many samples use. Defaults to 64.
+        """
+        self.log_every_n_batches = log_every_n_batches
+        self.number_of_samples = number_of_samples
+
+    def on_train_batch_end(self, trainer: pl.Trainer, pl_module: SdfExperiment, outputs, batch, batch_idx: int) -> None:
+        if trainer.global_step % self.log_every_n_batches != 0:
+            return
+        tensorboard: SummaryWriter = trainer.logger.experiment
+
+        if isinstance(pl_module.sdf_model, ComplexSiren):
+            freq = pl_module.sdf_model[0].complex_weight.detach().angle()
+        elif isinstance(pl_module.sdf_model, Siren):
+            freq = pl_module.sdf_model[0].weight.detach().norm(dim=-1, keepdim=False)
+        else:
+            return
+
+        tensorboard.add_histogram(
+            "frequencies",
+            freq[: self.number_of_samples],
+            global_step=trainer.global_step,
+        )
 
 
 if __name__ == "__main__":

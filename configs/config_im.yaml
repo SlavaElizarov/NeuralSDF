@@ -17,19 +17,20 @@ model:
 
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.siren.ComplexSiren
     init_args: 
       input_dim: 3
       hidden_dim: 256
-      hidden_layers: 4
+      hidden_layers: 6
       output_dim: 1
       outermost_linear: True
-      first_omega_0: 50.
-      hidden_omega_0: 60.
+      first_omega_0: 40.
+      hidden_omega_0: 30.
       use_geometric_initialization: False
       modulation_type: FILM
       bias_init_scheme: HE_UNIFORM
       self_modulate: []
+      init_scheme: SIREN_LOGNORMAL
 
   #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
@@ -41,7 +42,7 @@ model:
   level_set_loss_weight: 100.0
 
   #   (type: float, default: 1)
-  eikonal_loss_weight: 2.
+  eikonal_loss_weight: 4.
 
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
@@ -50,17 +51,20 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  high_order_loss_weight: 0.0
+  high_order_loss_weight: 0 #0.005
 
   high_order_loss_type: Div
 
   apply_high_order_loss_to: OffSurface
 
-  learning_rate: 0.00025
+  learning_rate: 0.00014
 
-  learning_rate_decay: 0.97
+  learning_rate_decay: 0.95 
 
   lr_warmup_steps: 300
+
+  random_points_per_vertex: 6
+
 
 
 # Path/URL of the checkpoint from which training is resumed. If there is
@@ -148,7 +152,7 @@ trainer:
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
   # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
-  max_epochs: 128
+  max_epochs: 200
 
   # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
   min_epochs:
