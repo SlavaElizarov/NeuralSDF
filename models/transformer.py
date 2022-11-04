@@ -2,7 +2,12 @@ from typing import List
 from torch import nn
 import torch
 from layers import CommutatorAttetionLayer, SirenLayer
-from layers.siren import ModulateArg, SirenBiasInitScheme, SirenInitScheme, SirenModulationType
+from layers.siren import (
+    ModulateArg,
+    SirenBiasInitScheme,
+    SirenInitScheme,
+    SirenModulationType,
+)
 
 from models.sdf import SDF
 
@@ -31,7 +36,7 @@ class TransSiren(nn.Sequential, SDF):
             init_scheme=SirenInitScheme.SIREN_UNIFORM,
             modulation_type=modulation_type,
             bias_init_scheme=bias_init_scheme,
-            self_modulate=self_modulate
+            self_modulate=self_modulate,
         )
 
         attention_layers = []
@@ -50,7 +55,7 @@ class TransSiren(nn.Sequential, SDF):
                         modulation_type=modulation_type,
                         bias_init_scheme=bias_init_scheme,
                         disable_activation=True,
-                        self_modulate=self_modulate
+                        self_modulate=self_modulate,
                     ),
                 )
             )
