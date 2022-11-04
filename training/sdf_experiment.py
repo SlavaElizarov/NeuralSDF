@@ -238,7 +238,7 @@ class SdfExperiment(pl.LightningModule):
         """ 
             Can be overrided in config
         """
-        optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=True)
+        optimizer = torch.optim.Adam(self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False)
         scheduler = ExponentialLR(optimizer, gamma=self.learning_rate_decay)
         return  [optimizer], [scheduler]
         
