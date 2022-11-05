@@ -36,9 +36,6 @@ class SdfExperiment(pl.LightningModule):
         high_order_loss_type: HighOrderLoss = HighOrderLoss.Div,
         apply_high_order_loss_to: ApplyHOLossTo = ApplyHOLossTo.Both,
         high_order_loss_weight: float = 0.001,
-        learning_rate: float = 0.00001,
-        learning_rate_decay: float = 0.94,
-        lr_warmup_steps: int = 300,
         random_points_per_vertex: int = 3,
     ):
         super().__init__()
@@ -54,9 +51,6 @@ class SdfExperiment(pl.LightningModule):
         self.offsurface_loss_margin = offsurface_loss_margin
         self.mesh_path = mesh_path  # it's a bit of an antipatern to have this here TODO: decouple data from experiment
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.learning_rate_decay = learning_rate_decay
-        self.lr_warmup_steps = lr_warmup_steps
         self.random_points_per_vertex = random_points_per_vertex
 
         self.random_sampler = torch.distributions.uniform.Uniform(
@@ -273,36 +267,3 @@ class SdfExperiment(pl.LightningModule):
             persistent_workers=False,
         )
 
-    def configure_optimizers(self):
-        """
-        Can be overrided in config
-        """
-        optimizer = torch.optim.Adam(
-            self.sdf_model.parameters(), lr=self.learning_rate, amsgrad=False
-        )
-        scheduler = ExponentialLR(optimizer, gamma=self.learning_rate_decay)
-        return [optimizer], [scheduler]
-
-    # learning rate warm-up
-    def optimizer_step(
-        self,
-        epoch,
-        batch_idx,
-        optimizer,
-        optimizer_idx,
-        optimizer_closure,
-        on_tpu=False,
-        using_native_amp=False,
-        using_lbfgs=False,
-    ):
-        # update params
-        optimizer.step(closure=optimizer_closure)
-
-        if self.lr_warmup_steps > 0:
-            # skip the first n steps
-            if self.trainer.global_step < self.lr_warmup_steps:
-                lr_scale = min(
-                    1.0, float(self.trainer.global_step + 1) / self.lr_warmup_steps
-                )
-                for pg in optimizer.param_groups:
-                    pg["lr"] = lr_scale * self.learning_rate
