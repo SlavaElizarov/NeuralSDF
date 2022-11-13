@@ -34,6 +34,7 @@ class CESLayer(nn.Module):
 
         frequency = self._init_siren_uniform(frequency)
         self.complex_weight = Parameter(torch.exp(1j * frequency), requires_grad=True)
+        self.branch = Parameter(frequency / self.complex_weight.angle(), requires_grad=True)
 
         if add_bias:
             self.bias = torch.Tensor(output_dim)
@@ -50,22 +51,23 @@ class CESLayer(nn.Module):
             self.register_parameter("bias", None)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = (x[:, None, :] + 1) * self.omega_0
-        y = self.complex_weight[None] ** x
+        x = x[:, None, :]
+        y = self.complex_weight[None] ** (x * self.branch[None].abs())
         y = torch.prod(y, dim=-1)
         y = y * self.bias
 
         return y.real
 
     def _init_siren_uniform(self, weight):
-        if self.is_first:
-            nn.init.uniform_(
-                weight, -torch.pi / self.input_dim, torch.pi / self.input_dim
-            )
-        else:
-            nn.init.uniform_(
-                weight,
-                -np.sqrt(6 / self.input_dim) / self.omega_0,
-                np.sqrt(6 / self.input_dim) / self.omega_0,
-            )
+        # if self.is_first:
+        nn.init.uniform_(
+            weight, -self.omega_0 / self.input_dim, self.omega_0 / self.input_dim
+        )
+        # else:
+        #     # raise NotImplementedError("Only first layer is implemented")
+        #     nn.init.uniform_(
+        #         weight,
+        #         -np.sqrt(6 / self.input_dim) / self.omega_0,
+        #         np.sqrt(6 / self.input_dim) / self.omega_0,
+        #     )
         return weight
