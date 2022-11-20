@@ -105,10 +105,11 @@ class Siren(nn.Sequential, SDF):
                 disable_activation=outermost_linear,
             )
         )
-        super().__init__(*layers)
 
         if use_geometric_initialization:
             layers.append(SirenGeometricHead())
+        
+        super().__init__(*layers)
 
         if use_geometric_initialization:
             self.geometric_init()
@@ -353,3 +354,40 @@ class ComplexSiren(Siren):
             omega_0=first_omega_0,
         )
         self[0] = first_layer
+
+
+class CESiren(nn.Sequential, SDF):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        hidden_layers: int,
+        output_dim: int,
+        first_omega_0: float = 30.0,
+        hidden_omega_0: float = 30.0,
+        init_scheme: SirenInitScheme = SirenInitScheme.SIREN_UNIFORM,
+    ):
+        super().__init__()
+        self.init_scheme = init_scheme
+        layers = []
+
+        for i in range(hidden_layers):
+            is_first = i == 0
+            layers.append(
+                CESLayer(
+                    input_dim if is_first else hidden_dim,
+                    hidden_dim,
+                    is_first=is_first,
+                    omega_0=first_omega_0 if is_first else hidden_omega_0,
+                )
+            )
+
+        layers.append(
+            nn.Linear(
+                hidden_dim,
+                output_dim,
+                bias=True,
+            )
+        )
+        
+        super().__init__(*layers)
