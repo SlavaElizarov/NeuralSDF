@@ -1,4 +1,3 @@
-import math
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
@@ -37,37 +36,29 @@ class CESLayer(nn.Module):
         self.branch = Parameter(frequency / self.complex_weight.angle(), requires_grad=True)
 
         if add_bias:
-            self.bias = torch.Tensor(output_dim)
+            self.bias = Parameter(torch.Tensor(output_dim), requires_grad=True)
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(frequency)
             torch.nn.init.uniform_(
-                self.bias, -torch.pi / math.sqrt(fan_in), torch.pi / math.sqrt(fan_in)
-            )
-            self.bias = Parameter(
-                torch.exp(torch.complex(torch.zeros_like(self.bias), self.bias)),
-                requires_grad=True,
+                self.bias, -torch.pi / np.sqrt(fan_in), torch.pi / np.sqrt(fan_in)
             )
 
         else:
             self.register_parameter("bias", None)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x[:, None, :]
-        y = self.complex_weight[None] ** (x * self.branch[None].abs())
-        y = torch.prod(y, dim=-1)
-        y = y * self.bias
+        branch = 1.0 + self.branch.abs()
+        
+        y = torch.cos(torch.nn.functional.linear(x, self.complex_weight.angle() * branch, self.bias))        
+        
+        radius = self.complex_weight.abs() #** branch
+        powers = torch.log(radius)
+        powers = torch.nn.functional.linear(x, powers)
+        radius = torch.exp(powers)
 
-        return y.real
+        return y * radius
 
     def _init_siren_uniform(self, weight):
-        # if self.is_first:
         nn.init.uniform_(
             weight, -self.omega_0 / self.input_dim, self.omega_0 / self.input_dim
         )
-        # else:
-        #     # raise NotImplementedError("Only first layer is implemented")
-        #     nn.init.uniform_(
-        #         weight,
-        #         -np.sqrt(6 / self.input_dim) / self.omega_0,
-        #         np.sqrt(6 / self.input_dim) / self.omega_0,
-        #     )
         return weight
