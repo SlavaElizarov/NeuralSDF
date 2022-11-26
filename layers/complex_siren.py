@@ -32,8 +32,7 @@ class CESLayer(nn.Module):
         frequency = torch.Tensor(output_dim, input_dim)
 
         frequency = self._init_siren_uniform(frequency)
-        self.complex_weight = Parameter(torch.exp(1j * frequency), requires_grad=True)
-        self.branch = Parameter(frequency / self.complex_weight.angle(), requires_grad=True)
+        self.complex_weight = Parameter(1j * frequency, requires_grad=True)
 
         if add_bias:
             self.bias = Parameter(torch.Tensor(output_dim), requires_grad=True)
@@ -41,16 +40,17 @@ class CESLayer(nn.Module):
             torch.nn.init.uniform_(
                 self.bias, -torch.pi / np.sqrt(fan_in), torch.pi / np.sqrt(fan_in)
             )
-
+ 
         else:
             self.register_parameter("bias", None)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        branch = 1.0 + self.branch.abs()
+        x = x + 1.0 # TODO: remove this hack
+        z = torch.exp(self.complex_weight)
         
-        y = torch.cos(torch.nn.functional.linear(x, self.complex_weight.angle() * branch, self.bias))        
+        y = torch.cos(torch.nn.functional.linear(x, self.complex_weight.imag, self.bias))        
         
-        radius = self.complex_weight.abs() #** branch
+        radius = z.abs()
         powers = torch.log(radius)
         powers = torch.nn.functional.linear(x, powers)
         radius = torch.exp(powers)
@@ -62,3 +62,4 @@ class CESLayer(nn.Module):
             weight, -self.omega_0 / self.input_dim, self.omega_0 / self.input_dim
         )
         return weight
+    
