@@ -4,13 +4,36 @@
 seed_everything: 42
 
 optimizer:
-  class_path: torch.optim.Adam
+  class_path: torch.optim.RAdam
   init_args:
-    lr: 0.00011
+    lr: 0.00012
 lr_scheduler:
-  class_path: torch.optim.lr_scheduler.ExponentialLR
+  # class_path: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+  # init_args:
+  #   T_0: 5
+  #   T_mult: 2
+  #   eta_min: 1e-06
+
+  # class_path: torch.optim.lr_scheduler.CyclicLR
+  # init_args:
+  #   base_lr: 1e-06
+  #   max_lr: 0.0001
+  #   step_size_up: 2525
+  #   mode: triangular2
+  #   cycle_momentum: false
+  # class_path: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+  # init_args:
+  #   T_0: 5
+  #   T_mult: 2
+    # eta_min: 1e-06
+  class_path: pytorch_lightning.cli.ReduceLROnPlateau 
   init_args:
-    gamma: 0.97
+    cooldown: 5
+    patience: 8
+    threshold: 0.007
+    min_lr: 0.000001
+    factor: 0.5
+    monitor: loss
 
 # <class 'training.sdf_experiment.SdfExperiment'>
 model:
@@ -24,7 +47,7 @@ model:
       hidden_layers: 6
       output_dim: 1
       outermost_linear: True
-      first_omega_0: 90.
+      first_omega_0: 128.
       hidden_omega_0: 30.
       use_geometric_initialization: False
       modulation_type: FILM
@@ -36,13 +59,13 @@ model:
   mesh_path: data/frazer-nash-super-sport-1929.obj
 
   #   (type: int, default: 1024)
-  batch_size: 10000
+  batch_size: 20000
 
   #   (type: float, default: 10)
   level_set_loss_weight: 100.0
 
   #   (type: float, default: 1)
-  eikonal_loss_weight: 4.
+  eikonal_loss_weight: 8.
 
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
@@ -57,7 +80,7 @@ model:
 
   apply_high_order_loss_to: OffSurface
 
-  random_points_per_vertex: 6
+  random_points_per_vertex: 8
 
 
 
