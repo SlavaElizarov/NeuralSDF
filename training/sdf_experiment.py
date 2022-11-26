@@ -5,7 +5,6 @@ import torch
 from torch.nn import functional as F
 from torch import autograd
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import ExponentialLR
 from models.sdf import SDF
 
 from training.dataset import MeshDataset
@@ -140,6 +139,7 @@ class SdfExperiment(pl.LightningModule):
             loss = loss + self.offsurface_loss_weight * offsurface_loss
             self.log("offsurface_loss", offsurface_loss, prog_bar=True)
 
+        self.log("loss", loss, prog_bar=True)  # TODO: remove this line 
         return loss
 
     def _offsurface_loss(self, distance: torch.Tensor) -> torch.Tensor:
