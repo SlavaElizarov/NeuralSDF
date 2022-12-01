@@ -11,6 +11,7 @@ class Initializer(ABC):
     def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
+
 class SirenInitializer(Initializer, ABC):
     def __init__(self, omega: float = 30.0) -> None:
         assert omega > 0
@@ -86,9 +87,8 @@ class SirenLogNormalInitializer(SirenInitializer):
     def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
         assert tensor.ndim == 2
         with torch.no_grad():
-                out, _ = tensor.shape
-                tensor = tensor.log_normal_(std=self.std)
-                tensor[: out // 2] *= -1
-                # tensor /= self.omega
-                return tensor
-
+            out, _ = tensor.shape
+            tensor = tensor.log_normal_(std=self.std)
+            tensor[: out // 2] *= -1
+            # tensor /= self.omega
+            return tensor

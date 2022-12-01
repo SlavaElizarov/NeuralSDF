@@ -8,8 +8,8 @@ import numpy as np
 class CrossAttentionLayer(nn.Module):
     def __init__(
         self,
-        first_input_dim: int,
-        second_input_dim: int,
+        first_in_features: int,
+        second_in_features: int,
         attention_dim: int = 64,
         number_of_heads: int = 8,
         value_dim: Optional[int] = None,
@@ -33,8 +33,8 @@ class CrossAttentionLayer(nn.Module):
         x is the query sequence, y is the key-value sequence.
 
         Args:
-            first_input_dim (int): Feature dimension of the first input sequence.
-            second_input_dim (int): Feature dimension of the second input sequence.
+            first_in_features (int): Feature dimension of the first input sequence.
+            second_in_features (int): Feature dimension of the second input sequence.
             attention_dim (int, optional): Dim of queries and keys. Defaults to 64.
             number_of_heads (int, optional): Number of heads. Defaults to 8.
             value_dim (Optional[int], optional): Feature dim of a value tokens and output. Defaults to None.
@@ -51,12 +51,14 @@ class CrossAttentionLayer(nn.Module):
         self.value_dim = value_dim
 
         self.query_projection = nn.Linear(
-            first_input_dim, attention_dim * number_of_heads
+            first_in_features, attention_dim * number_of_heads
         )
         self.key_projection = nn.Linear(
-            second_input_dim, attention_dim * number_of_heads
+            second_in_features, attention_dim * number_of_heads
         )
-        self.value_projection = nn.Linear(second_input_dim, value_dim * number_of_heads)
+        self.value_projection = nn.Linear(
+            second_in_features, value_dim * number_of_heads
+        )
 
         if use_dropout:
             self.dropout = nn.Dropout(drop_rate)
@@ -78,8 +80,8 @@ class CrossAttentionLayer(nn.Module):
         First sequence is the query sequence, second sequence is the key-value sequence.
 
         Args:
-            first_seq (torch.Tensor): Query sequence of shape (batch_size, q_len, first_input_dim).
-            second_seq (torch.Tensor): Key-value sequence of shape (batch_size, k_len, second_input_dim).
+            first_seq (torch.Tensor): Query sequence of shape (batch_size, q_len, first_in_features).
+            second_seq (torch.Tensor): Key-value sequence of shape (batch_size, k_len, second_in_features).
             return_scores (bool, optional): Return attention scores. Defaults to False.
 
         Returns:
@@ -115,8 +117,8 @@ class CrossAttentionLayer(nn.Module):
 class SubtractionCrossAttentionLayer(CrossAttentionLayer):
     def __init__(
         self,
-        first_input_dim: int,
-        second_input_dim: int,
+        first_in_features: int,
+        second_in_features: int,
         attention_dim: int = 64,
         number_of_heads: int = 8,
         value_dim: Optional[int] = None,
@@ -136,8 +138,8 @@ class SubtractionCrossAttentionLayer(CrossAttentionLayer):
         CAUTION: This layer is memory-intensive and should be used with care.
 
         Args:
-            first_input_dim (int): Feature dimension of the first input sequence.
-            second_input_dim (int): Feature dimension of the second input sequence.
+            first_in_features (int): Feature dimension of the first input sequence.
+            second_in_features (int): Feature dimension of the second input sequence.
             attention_dim (int, optional): Dim of queries and keys. Defaults to 64.
             number_of_heads (int, optional): Number of heads. Defaults to 8.
             value_dim (Optional[int], optional): Feature dim of a value tokens and output. Defaults to None.
@@ -145,8 +147,8 @@ class SubtractionCrossAttentionLayer(CrossAttentionLayer):
             drop_rate (float, optional): Dropout rate. Defaults to 0.1.
         """
         super().__init__(
-            first_input_dim,
-            second_input_dim,
+            first_in_features,
+            second_in_features,
             attention_dim,
             number_of_heads,
             value_dim,
@@ -167,8 +169,8 @@ class SubtractionCrossAttentionLayer(CrossAttentionLayer):
         First sequence is the query sequence, second sequence is the key-value sequence.
 
         Args:
-            first_seq (torch.Tensor): Query sequence of shape (batch_size, q_len, first_input_dim).
-            second_seq (torch.Tensor): Key-value sequence of shape (batch_size, k_len, second_input_dim).
+            first_seq (torch.Tensor): Query sequence of shape (batch_size, q_len, first_in_features).
+            second_seq (torch.Tensor): Key-value sequence of shape (batch_size, k_len, second_in_features).
             return_scores (bool, optional): Return attention scores. Defaults to False.
 
         Returns:
@@ -210,12 +212,14 @@ class CommutatorAttetionLayer(nn.Module):
     def __init__(
         self,
         n_heads: int = 1,
-        input_dim: int = 256,
+        in_features: int = 256,
         attention_dim: int = 64,
-        output_dim: int = 256,
+        out_features: int = 256,
         values_projection_factory: Callable[
             [int, int, int], nn.Module
-        ] = lambda input_dim, output_dim, head_id: nn.Linear(input_dim, output_dim),
+        ] = lambda in_features, out_features, head_id: nn.Linear(
+            in_features, out_features
+        ),
         scale_dot: bool = True,
     ):
         """
@@ -231,28 +235,28 @@ class CommutatorAttetionLayer(nn.Module):
 
         Args:
             n_heads (int, optional): Number of heads. Defaults to 1.
-            input_dim (int, optional): Input dimention. Defaults to 256.
+            in_features (int, optional): Input dimention. Defaults to 256.
             attention_dim (int, optional): Size of Q and K_h. Defaults to 64.
-            output_dim (int, optional): Size of V_h. Defaults to 256.
+            out_features (int, optional): Size of V_h. Defaults to 256.
             values_projection_factory (Callable[[int, int], nn.Module], optional):
                     Factory function for creating input to values projection. Defaults to Linear projection.
         """
         super().__init__()
         self.n_heads = n_heads
-        self.input_dim = input_dim
+        self.in_features = in_features
         self.attention_dim = attention_dim
 
         # TODO: Do ypu need to project keys? Looks pretty fixed
         self.keys_projections = torch.nn.ModuleList(
-            [nn.Linear(input_dim, attention_dim) for _ in range(n_heads)]
+            [nn.Linear(in_features, attention_dim) for _ in range(n_heads)]
         )
         self.values_projections = torch.nn.ModuleList(
             [
-                values_projection_factory(input_dim, output_dim, i)
+                values_projection_factory(in_features, out_features, i)
                 for i in range(n_heads)
             ]
         )
-        self.query_projection = torch.nn.Linear(input_dim, attention_dim)
+        self.query_projection = torch.nn.Linear(in_features, attention_dim)
         self.scale_dot = scale_dot
 
     def forward(self, x):
@@ -264,7 +268,7 @@ class CommutatorAttetionLayer(nn.Module):
         values = torch.stack(
             [value_projection(x) for value_projection in self.values_projections],
             dim=-1,
-        )  # (batch_size, output_dim, n_heads)
+        )  # (batch_size, out_features, n_heads)
 
         attention_dot = torch.einsum("ba,bah->bh", query, keys)  # (batch_size, n_heads)
         if self.scale_dot:
@@ -277,4 +281,4 @@ class CommutatorAttetionLayer(nn.Module):
         return (
             torch.einsum("bh,boh->bo", attention, values),
             attention,
-        )  # (batch_size, output_dim)
+        )  # (batch_size, out_features)
