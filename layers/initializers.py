@@ -90,5 +90,5 @@ class SirenLogNormalInitializer(SirenInitializer):
             out, _ = tensor.shape
             tensor = tensor.log_normal_(std=self.std)
             tensor[: out // 2] *= -1
-            # tensor /= self.omega
+            tensor /= self.omega
             return tensor
