@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn.parameter import Parameter
 import numpy as np
 
+from layers.initializers import SirenInitializer, SirenUniformInitializer
+
 
 class HelicoidLayer(nn.Module):
     def __init__(
@@ -10,8 +12,7 @@ class HelicoidLayer(nn.Module):
         in_features: int,
         out_features: int,
         add_bias: bool = True,
-        is_first: bool = True,
-        omega_0: float = 30,
+        init_scheme: SirenInitializer = SirenUniformInitializer(),
     ):
         """
         Siren-compatible layer with complex weights inspired by https://arxiv.org/abs/2210.14476
@@ -20,25 +21,24 @@ class HelicoidLayer(nn.Module):
             in_features (int):  Number of input features.
             out_features (int): Number of output features.
             bias (bool, optional): Add bias. Defaults to True.
-            omega_0 (int, optional): Kind of a frequency. Defaults to 30.
         """
 
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.omega_0 = omega_0
-        self.is_first = is_first
+        self.omega = init_scheme.omega
 
         frequency = torch.Tensor(out_features, in_features)
-
-        frequency = self._init_siren_uniform(frequency)
+        frequency = init_scheme(frequency)
         self.complex_weight = Parameter(1j * frequency, requires_grad=True)
 
         if add_bias:
             self.bias = Parameter(torch.Tensor(out_features), requires_grad=True)
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(frequency)
             torch.nn.init.uniform_(
-                self.bias, -torch.pi / np.sqrt(fan_in), torch.pi / np.sqrt(fan_in)
+                self.bias,
+                -torch.pi / np.sqrt(fan_in) / self.omega,
+                torch.pi / np.sqrt(fan_in) / self.omega,
             )
 
         else:
@@ -46,10 +46,16 @@ class HelicoidLayer(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + 1.0  # TODO: remove this hack
+
+        # helicoid parametrized by complex number, where imag part is frequency
+        # this parametrization is crucial since it allows network to control frequency
+        # indirectrly nudging z.abs()
+        # TODO: rigourous proof is needed
         z = torch.exp(self.complex_weight)
 
         y = torch.cos(
             torch.nn.functional.linear(x, self.complex_weight.imag, self.bias)
+            * self.omega
         )
 
         radius = z.abs()
@@ -58,9 +64,3 @@ class HelicoidLayer(nn.Module):
         radius = torch.exp(powers)
 
         return y * radius
-
-    def _init_siren_uniform(self, weight):
-        nn.init.uniform_(
-            weight, -self.omega_0 / self.in_features, self.omega_0 / self.in_features
-        )
-        return weight

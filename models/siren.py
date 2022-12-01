@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Type
+from typing import List
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
@@ -7,8 +7,8 @@ from layers import CrossAttentionLayer, SubtractionCrossAttentionLayer
 from layers import (
     SirenLayer,
 )
-from layers.complex_siren import HelicoidLayer
-from layers.initializers import Initializer, SirenInitializer, SirenUniformInitializer
+from layers.helicoid import HelicoidLayer
+from layers.initializers import SirenInitializer, SirenUniformInitializer
 
 from models.sdf import SDF
 
@@ -32,9 +32,12 @@ class Siren(nn.Sequential, SDF):
         hidden_layers: int,
         out_features: int,
         outermost_linear: bool = False,
-        first_layer_init: SirenInitializer = SirenUniformInitializer(omega=30.0, is_first=True),
-        hidden_layer_init: SirenInitializer = SirenUniformInitializer(omega=30.0, is_first=False),
-
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
@@ -59,13 +62,11 @@ class Siren(nn.Sequential, SDF):
                     init_scheme=first_layer_init if is_first else hidden_layer_init,
                 )
             )
-        l = SirenLayer(hidden_dim, 
-                       out_features, 
-                       add_bias=True, 
-                       disable_activation=outermost_linear)
+        l = SirenLayer(
+            hidden_dim, out_features, add_bias=True, disable_activation=outermost_linear
+        )
         nn.init.zeros_(l.bias)
         layers.append(l)
-            
 
         super().__init__(*layers)
 
@@ -77,14 +78,17 @@ class TransposedAttentionSiren(Siren):
         hidden_dim: int,
         hidden_layers: int,
         out_features: int,
-        first_omega_0: float = 30.0,
-        hidden_omega_0: float = 30.0,
         latent_seq_len: int = 64,
         use_dropout: bool = True,
         attention_dim: int = 64,
         attention_type: AttentionType = AttentionType.DOT,
         attention_modulate: List[ModulateArg] = [ModulateArg.Amplitude],
-        init_scheme: Initializer = SirenUniformInitializer(),
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
     ):
         super().__init__(
             in_features,
@@ -92,12 +96,11 @@ class TransposedAttentionSiren(Siren):
             hidden_layers,
             out_features,
             True,
-            first_omega_0,
-            hidden_omega_0,
-            init_scheme,
+            first_layer_init,
+            hidden_layer_init,
         )
 
-        assert len(attention_modulate) > 0, "Must modulate at least one parameter"
+        assert len(attention_modulate) > 0, "Should modulate at least one parameter"
 
         self.hidden_layers = hidden_layers
         self.modulate = attention_modulate
@@ -171,9 +174,12 @@ class ComplexSiren(Siren):
         hidden_layers: int,
         out_features: int,
         outermost_linear: bool = False,
-        first_omega_0: float = 30.0,
-        hidden_omega_0: float = 30.0,
-        init_scheme: Initializer = SirenUniformInitializer(),
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
     ):
         super().__init__(
             in_features,
@@ -181,15 +187,13 @@ class ComplexSiren(Siren):
             hidden_layers,
             out_features,
             outermost_linear,
-            first_omega_0,
-            hidden_omega_0,
-            init_scheme,
+            first_layer_init,
+            hidden_layer_init,
         )
 
         first_layer = HelicoidLayer(
             in_features=in_features,
             out_features=hidden_dim,
-            is_first=True,
-            omega_0=first_omega_0,
+            init_scheme=first_layer_init,
         )
         self[0] = first_layer

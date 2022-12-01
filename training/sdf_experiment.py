@@ -63,6 +63,8 @@ class SdfExperiment(pl.LightningModule):
             self._high_order_loss = self._hessian_loss
         else:
             raise NotImplementedError(f"Loss {high_order_loss_type} is not implemented")
+        
+        self.save_hyperparameters()
 
     def _sample_offsurface_points(self, batch_size: int) -> torch.Tensor:
         return self.random_sampler.sample((batch_size, 3))[:, :, 0].to(self.device)  # type: ignore
@@ -139,7 +141,7 @@ class SdfExperiment(pl.LightningModule):
             loss = loss + self.offsurface_loss_weight * offsurface_loss
             self.log("offsurface_loss", offsurface_loss, prog_bar=True)
 
-        self.log("loss", loss, prog_bar=True)  # TODO: remove this line 
+        self.log("loss", loss, prog_bar=True)  # TODO: remove this line
         return loss
 
     def _offsurface_loss(self, distance: torch.Tensor) -> torch.Tensor:
@@ -266,4 +268,3 @@ class SdfExperiment(pl.LightningModule):
             num_workers=4,
             persistent_workers=False,
         )
-
