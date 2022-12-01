@@ -62,11 +62,11 @@ class Siren(nn.Sequential, SDF):
                     init_scheme=first_layer_init if is_first else hidden_layer_init,
                 )
             )
-        l = SirenLayer(
+        final_layer = SirenLayer(
             hidden_dim, out_features, add_bias=True, disable_activation=outermost_linear
         )
-        nn.init.zeros_(l.bias)
-        layers.append(l)
+        nn.init.zeros_(final_layer.bias)
+        layers.append(final_layer)
 
         super().__init__(*layers)
 
