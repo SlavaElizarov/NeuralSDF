@@ -36,7 +36,7 @@ To train a model use the folowing command:
 
 ### On optimization algorithms:
 * Adam with amsgrad=False and lr=1e-4 works better than amsgrad=True
-* RAdam results slightly worse than Adam by metrics and less noisy visually but a bit unstable during training
+* RAdam results slightly worse than Adam by metrics and less noisy visually (especially noticable if LogNormal init is used) but a bit unstable during training
 
 
 

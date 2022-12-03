@@ -64,7 +64,7 @@ class SdfExperiment(pl.LightningModule):
         else:
             raise NotImplementedError(f"Loss {high_order_loss_type} is not implemented")
         
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['sdf_model'])
 
     def _sample_offsurface_points(self, batch_size: int) -> torch.Tensor:
         return self.random_sampler.sample((batch_size, 3))[:, :, 0].to(self.device)  # type: ignore
