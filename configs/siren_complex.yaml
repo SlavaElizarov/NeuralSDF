@@ -3,37 +3,19 @@
 # Set to an int to run seed_everything with this value before classes instantiation (type: Union[int, null], default: 42)
 seed_everything: 42
 
+# optimizer:
+#   class_path: torch.optim.RAdam
+#   init_args:
+#     lr: 0.00011
 optimizer:
-  class_path: torch.optim.RAdam
+  class_path: torch.optim.Adam
   init_args:
-    lr: 0.00012
+    lr: 0.00011
+    amsgrad: False
 lr_scheduler:
-  # class_path: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-  # init_args:
-  #   T_0: 5
-  #   T_mult: 2
-  #   eta_min: 1e-06
-
-  # class_path: torch.optim.lr_scheduler.CyclicLR
-  # init_args:
-  #   base_lr: 1e-06
-  #   max_lr: 0.0001
-  #   step_size_up: 2525
-  #   mode: triangular2
-  #   cycle_momentum: false
-  # class_path: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-  # init_args:
-  #   T_0: 5
-  #   T_mult: 2
-    # eta_min: 1e-06
-  class_path: pytorch_lightning.cli.ReduceLROnPlateau 
+  class_path: torch.optim.lr_scheduler.ExponentialLR
   init_args:
-    cooldown: 5
-    patience: 8
-    threshold: 0.007
-    min_lr: 0.000001
-    factor: 0.5
-    monitor: loss
+    gamma: 0.97
 
 # <class 'training.sdf_experiment.SdfExperiment'>
 model:
@@ -42,18 +24,20 @@ model:
   sdf_model:
     class_path: models.siren.ComplexSiren
     init_args: 
-      input_dim: 3
+      in_features: 3
       hidden_dim: 256
       hidden_layers: 6
-      output_dim: 1
+      out_features: 1
       outermost_linear: True
-      first_omega_0: 128.
-      hidden_omega_0: 30.
-      use_geometric_initialization: False
-      modulation_type: FILM
-      bias_init_scheme: HE_UNIFORM
-      self_modulate: []
-      init_scheme: SIREN_UNIFORM
+      first_layer_init:
+        class_path: layers.initializers.SirenLogNormalInitializer
+        init_args:
+          omega: 30.0
+          std: 2.2
+      hidden_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 30.0
 
   #   (required, type: str)
   mesh_path: data/frazer-nash-super-sport-1929.obj
@@ -65,7 +49,7 @@ model:
   level_set_loss_weight: 100.0
 
   #   (type: float, default: 1)
-  eikonal_loss_weight: 8.
+  eikonal_loss_weight: 2.
 
   #   (type: float, default: 1)
   grad_direction_loss_weight: 3.0
@@ -74,13 +58,13 @@ model:
 
   offsurface_loss_margin: 0.0025
 
-  high_order_loss_weight: 0 #0.005
+  high_order_loss_weight: 0.0
 
   high_order_loss_type: Div
 
   apply_high_order_loss_to: OffSurface
 
-  random_points_per_vertex: 8
+  random_points_per_vertex: 5
 
 
 
@@ -169,7 +153,7 @@ trainer:
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
   # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
-  max_epochs: 200
+  max_epochs: 128
 
   # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
   min_epochs:
@@ -295,4 +279,26 @@ trainer:
   auto_scale_batch_size: false
 
   # Plugins allow modification of core behavior like ddp and amp, and enable custom lightning plugins.
-  # Default: ``None``. (type: Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str, List[Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str]], null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin, pytorch_lightning.plugins.PrecisionPlugin, pytorch_lightning.plugins.precision.MixedPrecisionPlugin, pytorch_lightning.plugins.ApexMixedPrecisionPlugin, pytorch_lightning.plugins.NativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeNativeMixedPrecisionPlugin, pytorch_lightning.plugins.ShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShard
+  # Default: ``None``. (type: Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str, List[Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str]], null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin, pytorch_lightning.plugins.PrecisionPlugin, pytorch_lightning.plugins.precision.MixedPrecisionPlugin, pytorch_lightning.plugins.ApexMixedPrecisionPlugin, pytorch_lightning.plugins.NativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeNativeMixedPrecisionPlugin, pytorch_lightning.plugins.ShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.DeepSpeedPrecisionPlugin, pytorch_lightning.plugins.DoublePrecisionPlugin, pytorch_lightning.plugins.HPUPrecisionPlugin, pytorch_lightning.plugins.IPUPrecisionPlugin, pytorch_lightning.plugins.TPUPrecisionPlugin, pytorch_lightning.plugins.TPUBf16PrecisionPlugin, pytorch_lightning.plugins.environments.BaguaEnvironment, pytorch_lightning.plugins.environments.KubeflowEnvironment, pytorch_lightning.plugins.environments.LightningEnvironment, pytorch_lightning.plugins.environments.LSFEnvironment, pytorch_lightning.plugins.environments.SLURMEnvironment, pytorch_lightning.plugins.environments.TorchElasticEnvironment, pytorch_lightning.plugins.environments.XLAEnvironment, pytorch_lightning.plugins.AsyncCheckpointIO, pytorch_lightning.plugins.TorchCheckpointIO, pytorch_lightning.plugins.HPUCheckpointIO, pytorch_lightning.plugins.XLACheckpointIO, pytorch_lightning.plugins.NativeSyncBatchNorm)
+  plugins:
+
+  # The mixed precision backend to use ("native" or "apex").
+  # Default: ``'native''``. (type: str, default: native)
+  amp_backend: native
+
+  # The optimization level to use (O1, O2, etc...). By default it will be set to "O2"
+  # if ``amp_backend`` is set to "apex". (type: Optional[str], default: null)
+  amp_level:
+
+  # Whether to force internal logged metrics to be moved to cpu.
+  # This can save some gpu memory, but can make training slower. Use with attention.
+  # Default: ``False``. (type: bool, default: False)
+  move_metrics_to_cpu: false
+
+  # How to loop over the datasets when there are multiple train loaders.
+  # In 'max_size_cycle' mode, the trainer ends one epoch when the largest dataset is traversed,
+  # and smaller datasets reload when running out of their data. In 'min_size' mode, all the datasets
+  # reload when reaching the minimum length of datasets.
+  # Default: ``"max_size_cycle"``. (type: str, default: max_size_cycle)
+  multiple_trainloader_mode: max_size_cycle
+

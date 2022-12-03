@@ -19,10 +19,10 @@ model:
   sdf_model:
     class_path: models.bacon.Bacon
     init_args: 
-      input_dim: 3
+      in_features: 3
       hidden_dim: 128
       hidden_layers: 8
-      output_dim: 1
+      out_features: 1
       omega_max: 256
       quantization: 64
 

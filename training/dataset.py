@@ -65,7 +65,7 @@ class MeshDataset(Dataset):
         V = meshes.verts_packed()  # type: ignore
 
         # Find the max distance to origin
-        max_dist = torch.sqrt(torch.max(torch.sum(V ** 2, dim=-1)))
+        max_dist = torch.sqrt(torch.max(torch.sum(V**2, dim=-1)))
         V_scale = 1.0 / max_dist
         meshes.scale_verts_(V_scale.item())
 
