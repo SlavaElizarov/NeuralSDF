@@ -32,6 +32,7 @@ To train a model use the folowing command:
 * [ ] Implement [Critical Regularizations for Neural Surface Reconstruction in the Wild](https://arxiv.org/abs/2206.03087)
 * [ ] Implement [Learning Deep Implicit Functions for 3D Shapes with Dynamic Code Clouds](https://arxiv.org/abs/2203.14048)
 * [x] Investigate bias initialization for PFA modulation method. Result: PFA modulation was removed from the code.
+* [ ] Investigate [Rectified Adam optimizer](https://arxiv.org/abs/1908.03265) influence on perceptual quality. 
 
 
 ### On optimization algorithms:
