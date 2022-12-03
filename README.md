@@ -2,7 +2,10 @@
 
 NeuralSDF is a library for reconstructing implicit 3D surface from meshes and point clouds.
 
-![SDF](car.gif)
+<p align="center">
+  <img src="car.gif" alt="sdf" />
+</p>
+
 
 
 To train a model use the folowing command:
