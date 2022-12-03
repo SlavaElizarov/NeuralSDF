@@ -1,3 +1,4 @@
+import math
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
@@ -34,13 +35,11 @@ class HelicoidLayer(nn.Module):
 
         if add_bias:
             self.bias = Parameter(torch.Tensor(out_features), requires_grad=True)
-            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(frequency)
-            torch.nn.init.uniform_(
-                self.bias,
-                -torch.pi / np.sqrt(fan_in) / self.omega,
-                torch.pi / np.sqrt(fan_in) / self.omega,
-            )
-
+            # initialization copied from nn.Linear
+            # TODO: investigate different initialization schemes
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(frequency)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            nn.init.uniform_(self.bias, -bound, bound)
         else:
             self.register_parameter("bias", None)
 
@@ -58,6 +57,7 @@ class HelicoidLayer(nn.Module):
             * self.omega
         )
 
+        # log-exp trick to reduce memory footprint
         radius = z.abs()
         powers = torch.log(radius)
         powers = torch.nn.functional.linear(x, powers)
