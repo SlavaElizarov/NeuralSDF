@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Callable
+import numpy as np
 import pytorch_lightning as pl
 import torch
 from torch.nn import functional as F
@@ -8,6 +9,7 @@ from torch.utils.data import DataLoader
 from models.sdf import SDF
 
 from training.dataset import MeshDataset
+from utils import LatinHypercubeSampler
 
 
 class HighOrderLoss(Enum):
@@ -52,8 +54,8 @@ class SdfExperiment(pl.LightningModule):
         self.batch_size = batch_size
         self.random_points_per_vertex = random_points_per_vertex
 
-        self.random_sampler = torch.distributions.uniform.Uniform(
-            torch.tensor([-1.1]), torch.tensor([1.1])
+        self.sampler = LatinHypercubeSampler(
+            np.array([[-1.1, 1.1], [-1.1, 1.1], [-1.1, 1.1]])
         )
 
         self._high_order_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
@@ -67,7 +69,7 @@ class SdfExperiment(pl.LightningModule):
         self.save_hyperparameters(ignore=["sdf_model"])
 
     def _sample_offsurface_points(self, batch_size: int) -> torch.Tensor:
-        return self.random_sampler.sample((batch_size, 3))[:, :, 0].to(self.device)  # type: ignore
+        return self.sampler.sample(batch_size * 2).to(self.device)  # type: ignore
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         surface_points, surface_normals = batch
