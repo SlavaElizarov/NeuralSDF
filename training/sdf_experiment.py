@@ -27,8 +27,6 @@ class SdfExperiment(pl.LightningModule):
     def __init__(
         self,
         sdf_model: SDF,
-        mesh_path: str,
-        batch_size: int = 1024,
         level_set_loss_weight: float = 10,
         eikonal_loss_weight: float = 1,
         grad_direction_loss_weight: float = 1,
@@ -37,7 +35,6 @@ class SdfExperiment(pl.LightningModule):
         high_order_loss_type: HighOrderLoss = HighOrderLoss.Div,
         apply_high_order_loss_to: ApplyHOLossTo = ApplyHOLossTo.Both,
         high_order_loss_weight: float = 0.001,
-        random_points_per_vertex: int = 3,
     ):
         super().__init__()
 
@@ -50,13 +47,6 @@ class SdfExperiment(pl.LightningModule):
         self.high_order_loss_type = high_order_loss_type
         self.apply_high_order_loss_to = apply_high_order_loss_to
         self.offsurface_loss_margin = offsurface_loss_margin
-        self.mesh_path = mesh_path  # it's a bit of an antipatern to have this here TODO: decouple data from experiment
-        self.batch_size = batch_size
-        self.random_points_per_vertex = random_points_per_vertex
-
-        self.sampler = LatinHypercubeSampler(
-            np.array([[-1.1, 1.1], [-1.1, 1.1], [-1.1, 1.1]])
-        )
 
         self._high_order_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
         if high_order_loss_type == HighOrderLoss.Div:
@@ -68,18 +58,9 @@ class SdfExperiment(pl.LightningModule):
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
-    def _sample_offsurface_points(self, batch_size: int) -> torch.Tensor:
-        return self.sampler.sample(batch_size).to(self.device)  # type: ignore
-
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-        surface_points, surface_normals = batch
+        surface_points, surface_normals, offsurface_points = batch
         batch_size = surface_points.shape[0]
-
-        # sample off-surface points
-        # There is no guarantee that these points are actually off-surface
-        # but probability of landing on the surface is pretty low
-        # TODO: consider using a more sophisticated sampling method
-        offsurface_points = self._sample_offsurface_points(batch_size)
 
         surface_points.requires_grad_(True)
         offsurface_points.requires_grad_(True)
@@ -143,7 +124,7 @@ class SdfExperiment(pl.LightningModule):
             loss = loss + self.offsurface_loss_weight * offsurface_loss
             self.log("offsurface_loss", offsurface_loss, prog_bar=True)
 
-        self.log("loss", loss, prog_bar=True)  # TODO: remove this line
+        self.log("loss", loss, prog_bar=True)  # TODO: find a way to remove this line
         return loss
 
     def _offsurface_loss(self, distance: torch.Tensor) -> torch.Tensor:
@@ -254,19 +235,3 @@ class SdfExperiment(pl.LightningModule):
         # https://en.wikipedia.org/wiki/Matrix_norm#%22Entry-wise%22_matrix_norms
         h_norm = torch.concat([dx, dy, dz], dim=1).abs().sum(dim=1)
         return h_norm.mean()
-
-    # TODO: decouple dataset from experiment, add paprameters to config
-    def train_dataloader(self) -> DataLoader:
-        mesh_dataset = MeshDataset(
-            self.mesh_path,
-            frac_points_to_sample=self.random_points_per_vertex,
-            device="cpu",
-        )
-        return DataLoader(
-            mesh_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            pin_memory=True,
-            num_workers=4,
-            persistent_workers=False,
-        )

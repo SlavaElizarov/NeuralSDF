@@ -27,6 +27,9 @@ class LatinHypercubeSampler:
         self.region = region
         self.dim = region.shape[0]
 
+    def __call__(self, n_samples: int, device: str = "cuda") -> torch.Tensor:
+        return self.sample(n_samples, device)
+
     def sample(self, n_samples: int, device: str = "cuda") -> torch.Tensor:
         assert n_samples > 0, "Number of samples must be greater than 0."
         assert device in ["cpu", "cuda"], "Device must be either 'cpu' or 'cuda'."

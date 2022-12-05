@@ -4,9 +4,9 @@ from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
 from pytorch_lightning.cli import LightningCLI
 import pytorch_lightning as pl
-from models.siren import ComplexSiren, Siren
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
+from training.mesh_data_module import SdfDataModule
 
 from training.sdf_experiment import SdfExperiment
 
@@ -79,5 +79,12 @@ class ActivationDistributionCalback(pl.Callback):
             module.register_forward_hook(hook)
 
 
+class ResampleCallback(pl.Callback):
+    def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
+        trainer.datamodule.resample()
+
+
 if __name__ == "__main__":
-    LightningCLI(SdfExperiment, seed_everything_default=42)
+    LightningCLI(
+        SdfExperiment, datamodule_class=SdfDataModule, seed_everything_default=42
+    )
