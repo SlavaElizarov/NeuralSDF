@@ -69,7 +69,7 @@ class SdfExperiment(pl.LightningModule):
         self.save_hyperparameters(ignore=["sdf_model"])
 
     def _sample_offsurface_points(self, batch_size: int) -> torch.Tensor:
-        return self.sampler.sample(batch_size * 2).to(self.device)  # type: ignore
+        return self.sampler.sample(batch_size).to(self.device)  # type: ignore
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         surface_points, surface_normals = batch
