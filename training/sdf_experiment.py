@@ -23,7 +23,7 @@ class SdfExperiment(pl.LightningModule):
         eikonal_loss: EikonalLoss,
         grad_direction_loss: Optional[GradientDirectionLoss],
         offsurface_loss: OffSurfaceLoss,
-        laplacian_loss: Optional[LaplacianLoss],
+        laplacian_loss: Optional[LaplacianLoss] = None,
     ):
         super().__init__()
 
@@ -75,12 +75,12 @@ class SdfExperiment(pl.LightningModule):
         # Unfortunately, losses above are not always enough to make distance field smooth and consistent
         if self.laplacian_loss is not None:
             laplacian = self.laplacian(gradient, points)
-            loss += self.laplacian_loss(laplacian, gradient)
+            loss += self.laplacian_loss(laplacian, gradient, distances)
 
         # SDF must be positive outside the surface
         # this loss aims to reduce a shadow geomtry around the surface
         if self.offsurface_loss is not None:
-            loss += self.offsurface_loss(offsurface_distances, gradient)
+            loss += self.offsurface_loss(offsurface_distances, gradient[batch_size:])
 
         self.log("loss", loss, prog_bar=True)  # TODO: find a way to remove this line
         return loss
