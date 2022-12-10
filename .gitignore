@@ -1,3 +1,15 @@
+# Video
+*.mp4
+*.mkv
+*.webm
+*.avi
+
+# Lighting stuff
+lightning_logs/*
+
+# Vscode
+.vscode/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
