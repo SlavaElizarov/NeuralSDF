@@ -39,32 +39,50 @@ model:
         init_args:
           omega: 30.0
 
-  #   (required, type: str)
-  mesh_path: data/frazer-nash-super-sport-1929.obj
+  level_set_loss: 
+    class_path: losses.SurfaceLoss
+    init_args: 
+      weight: 100.0
 
-  #   (type: int, default: 1024)
-  batch_size: 20000
+  eikonal_loss:
+    class_path: losses.EikonalLoss
+    init_args: 
+      weight: 2.0
 
-  #   (type: float, default: 10)
-  level_set_loss_weight: 100.0
+  grad_direction_loss:
+    class_path: losses.GradientDirectionLoss
+    init_args: 
+      weight: 3.0
+      type: cos
 
-  #   (type: float, default: 1)
-  eikonal_loss_weight: 2.
+  offsurface_loss:
+    class_path: losses.MarginLoss
+    init_args: 
+      weight: 30.0
+      margin: 0.0025
+    # class_path: losses.CoareaLoss
+    # init_args: 
+    #   weight: 3e-2
+    #   beta: 0.005
 
-  #   (type: float, default: 1)
-  grad_direction_loss_weight: 3.0
+  laplacian_loss:
+      # class_path: losses.ViscosityLoss
+      # init_args: 
+      #   weight: 0.1
+      #   epsilon: 0.001
 
-  offsurface_loss_weight: 30.0
+# <class 'training.mesh_data_module.SdfDataModule'>
+data:
 
-  offsurface_loss_margin: 0.0025
-
-  high_order_loss_weight: 0.0
-
-  high_order_loss_type: Div
-
-  apply_high_order_loss_to: OffSurface
-
-  random_points_per_vertex: 5
+  #   (required, type: <class 'MeshDataset'>, known subclasses: training.dataset.MeshDataset)
+  dataset:
+    class_path: training.dataset.MeshDataset
+    init_args: 
+      mesh_path: data/frazer-nash-super-sport-1929.obj
+      samples_per_epoch: 10240000
+      add_vertices: true
+      device: cpu
+  batch_size: 10000
 
 
 
@@ -88,7 +106,7 @@ trainer:
     - train_sdf.ActivationDistributionCalback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
-    # - train_sdf.SirenFrequencyCalback
+    - train_sdf.ResampleCallback
 
   # Default path for logs and weights when no logger/ckpt_callback passed.
   # Default: ``os.getcwd()``.
@@ -153,7 +171,7 @@ trainer:
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
   # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
-  max_epochs: 128
+  max_epochs: 256
 
   # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
   min_epochs:

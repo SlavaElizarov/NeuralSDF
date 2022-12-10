@@ -1,8 +1,7 @@
 import math
 import torch
 from torch import nn
-from torch.nn.parameter import Parameter
-import numpy as np
+from torch.nn import Parameter
 
 from layers.initializers import SirenInitializer, SirenUniformInitializer
 
@@ -30,7 +29,7 @@ class HelicoidLayer(nn.Module):
         self.omega = init_scheme.omega
 
         frequency = torch.Tensor(out_features, in_features)
-        frequency = init_scheme(frequency)
+        frequency = init_scheme(frequency) * self.omega
         self.complex_weight = Parameter(1j * frequency, requires_grad=True)
 
         if add_bias:
@@ -54,7 +53,7 @@ class HelicoidLayer(nn.Module):
 
         y = torch.cos(
             torch.nn.functional.linear(x, self.complex_weight.imag, self.bias)
-            * self.omega
+            # * self.omega
         )
 
         # log-exp trick to reduce memory footprint

@@ -157,7 +157,9 @@ class TransposedAttentionSiren(Siren):
             layer = self[i]
             frequency_mod = None
             if ModulateArg.Frequency.name in modulation_dict:
-                frequency_mod = modulation_dict[ModulateArg.Frequency.name][:, 0, i - 1, :]
+                frequency_mod = modulation_dict[ModulateArg.Frequency.name][
+                    :, 0, i - 1, :
+                ]
 
             phase_mod = None
             if ModulateArg.Phase.name in modulation_dict:

@@ -1,4 +1,7 @@
+from abc import ABC
 import os
+from typing import Tuple
+import numpy as np
 
 import torch
 from torch.utils.data import Dataset
@@ -6,56 +9,76 @@ from pytorch3d.structures import Meshes
 from pytorch3d.io import load_objs_as_meshes
 from pytorch3d.ops import sample_points_from_meshes
 
+from utils import LatinHypercubeSampler
+
+
+class MeshSampler(ABC):
+    def __init__(self, mesh: Meshes):
+        self.mesh = mesh
+
+    def sample(self, num_samples: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        raise NotImplementedError()
+
+    def __call__(self, num_samples: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        return self.sample(num_samples)
+
+
+class UniformMeshSampler(MeshSampler):
+    def sample(self, num_samples: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        samples = sample_points_from_meshes(
+            self.mesh, num_samples=num_samples, return_normals=True
+        )
+        assert len(samples) == 2
+        points, normals = samples
+        return points, normals
+
 
 class MeshDataset(Dataset):
     def __init__(
-        self, mesh_filepath: str, frac_points_to_sample: int = 0, device: str = "cuda"
+        self,
+        mesh_path: str,
+        samples_per_epoch: int = 1000,
+        add_vertices: bool = True,
+        device: str = "cuda",
     ):
-        assert os.path.exists(mesh_filepath)
-        assert mesh_filepath.endswith(".obj")
+        assert os.path.exists(mesh_path)
+        assert mesh_path.endswith(".obj")
+        assert samples_per_epoch > 0
+        assert device in ["cuda", "cpu"]
 
-        meshes = load_objs_as_meshes([mesh_filepath], device=device)
-        self.mesh: Meshes = self.normalize_to_unit_sphere(meshes)
-        self.frac_points_to_sample = frac_points_to_sample
-
-        self.vertices: torch.Tensor
-        self.normals: torch.Tensor
-        self.set_vertices_and_normals()
-        self.add_random_points()
-
-        self.steps_til_resample = self.__len__()
-
-    def set_vertices_and_normals(self):
-        vertices = self.mesh.verts_packed()
-        assert vertices is not None
-        self.vertices = vertices
-
-        normals = self.mesh.verts_normals_packed()
-        assert normals is not None
-        self.normals = normals
-
-    def add_random_points(self) -> None:
-        n_points_to_sample = int(self.vertices.shape[0] * self.frac_points_to_sample)
-
-        if n_points_to_sample <= 0:
-            return
-
-        # There is a problem with such strategy since sample weight is proportional to face area
-        # So biggest faces are sampled more than smaller ones it can cause a lack of details
-        # (complex geometry modeled with a smalest faces)
-        # We should sample points evenly. There is a sutable function in trimesh trimesh.sample.sample_surface_even
-        # Another option reveight regions based on curvature
-        # TODO: investigate sampling strategies
-        samples = sample_points_from_meshes(
-            self.mesh, n_points_to_sample, return_normals=True
+        self.device = device
+        self.mesh_filepath = mesh_path
+        self.samples_per_epoch = samples_per_epoch
+        self.add_vertices = add_vertices
+        self.mesh: Meshes = self._load_mesh(mesh_path)
+        self.mesh_sampler = UniformMeshSampler(self.mesh)
+        self.space_sampler = LatinHypercubeSampler(
+            np.array([[-1.1, 1.1], [-1.1, 1.1], [-1.1, 1.1]])
         )
-        assert len(samples) == 2
-        sampled_points, sampled_normals = samples
 
-        self.vertices = torch.cat([self.vertices, sampled_points[0]], dim=0)
-        self.normals = torch.cat([self.normals, sampled_normals[0]], dim=0)
+        self._surface_points: torch.Tensor
+        self._normals: torch.Tensor
+        self._off_surface_points: torch.Tensor
+        self.resample()
 
-    def normalize_to_unit_sphere(self, meshes: Meshes) -> Meshes:
+    def _load_mesh(self, mesh_filepath: str):
+        meshes = load_objs_as_meshes([mesh_filepath], device=self.device)
+        return self._normalize_to_unit_sphere(meshes)
+
+    def resample(self):
+        points, normals = self.mesh_sampler(self.samples_per_epoch)
+        points, normals = points[0], normals[0]
+        if self.add_vertices:
+            points = torch.cat([points, self.mesh.verts_packed()], dim=0)  # type: ignore
+            normals = torch.cat([normals, self.mesh.verts_normals_packed()], dim=0)  # type: ignore
+
+        self._surface_points = points
+        self._normals = normals
+        self._off_surface_points = self.space_sampler(
+            self._surface_points.shape[0], device=self.device
+        )
+
+    def _normalize_to_unit_sphere(self, meshes: Meshes) -> Meshes:
         V: torch.Tensor = meshes.verts_packed()  # type: ignore
         V_max, _ = torch.max(V, dim=0)
         V_min, _ = torch.min(V, dim=0)
@@ -72,14 +95,13 @@ class MeshDataset(Dataset):
         return meshes
 
     def __len__(self):
-        return self.vertices.shape[0]
+        return self._surface_points.shape[0]
 
     def __getitem__(self, idx):
-        if self.steps_til_resample <= 0:
-            self.set_vertices_and_normals()
-            self.add_random_points()
-
-            self.steps_til_resample = self.__len__()
-
-        self.steps_til_resample -= 1
-        return self.vertices[idx], self.normals[idx]
+        return (
+            self._surface_points[idx],
+            self._normals[idx],
+            self._off_surface_points[
+                idx % self._off_surface_points.shape[0]
+            ],  # TODO: this is a hack
+        )
