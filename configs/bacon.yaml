@@ -78,25 +78,19 @@ ckpt_path:
 
 # Customize every aspect of training via flags
 trainer:
-
+  default_root_dir: logs/bacon
   logger: true
-
   enable_checkpointing: true
 
   # Add a callback or list of callbacks.
-  # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.VisualizationCalback)
+  # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.RenderingCalback)
   callbacks: 
-    - train_sdf.VisualizationCalback
-    - train_sdf.ActivationDistributionCalback
-    - train_sdf.ResampleCallback
+    - callbacks.RenderingCalback
+    - callbacks.ActivationDistributionCalback
+    - callbacks.ResampleCallback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
-    # - train_sdf.SirenFrequencyCalback
-
-  # Default path for logs and weights when no logger/ckpt_callback passed.
-  # Default: ``os.getcwd()``.
-  # Can be remote file paths such as `s3://mybucket/path` or 'hdfs://path/' (type: Optional[str], default: null)
-  default_root_dir:
+    # - callbacks.SirenFrequencyCalback
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.

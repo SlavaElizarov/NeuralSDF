@@ -6,6 +6,7 @@
 
 # Lighting stuff
 lightning_logs/*
+logs/*
 
 # Vscode
 .vscode/*
