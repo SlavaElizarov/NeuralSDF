@@ -53,7 +53,7 @@ class MeshDataset(Dataset):
         self.mesh: Meshes = self._load_mesh(mesh_path)
         self.mesh_sampler = UniformMeshSampler(self.mesh)
         self.space_sampler = LatinHypercubeSampler(
-            np.array([[-1.1, 1.1], [-1.1, 1.1], [-1.1, 1.1]])
+            np.array([[-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]])
         )
 
         self._surface_points: torch.Tensor

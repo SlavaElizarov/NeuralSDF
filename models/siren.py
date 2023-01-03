@@ -1,6 +1,7 @@
+import torch
 from torch import nn
 
-from layers import SirenLayer, HelicoidLayer
+from layers import SirenLayer, ComplexExpLayer
 from layers.initializers import SirenInitializer, SirenUniformInitializer
 from models.sdf import SDF
 
@@ -77,9 +78,13 @@ class ComplexSiren(Siren):
             hidden_layer_init,
         )
 
-        first_layer = HelicoidLayer(
+        first_layer = ComplexExpLayer(
             in_features=in_features,
             out_features=hidden_dim,
             init_scheme=first_layer_init,
         )
         self[0] = first_layer
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x + 1.0  # TODO: Remove this hack
+        return super().forward(x)
