@@ -30,7 +30,7 @@ To train a model use the folowing command:
 * [ ] Implement poisson disk sampling. [Fast Poisson Disk Sampling in Arbitrary Dimensions](https://www.cs.ubc.ca/~bridson/docs/bridson-siggraph07-poissondisk.pdf)
 * [ ] Implement geodesic training for 3d meshes
 * [x] Implement complex valued layer from [Sinusoidal Frequency Estimation by Gradient Descent](https://arxiv.org/abs/2210.14476)
-* [x] Make complex valued layer able to learn frequencied bigger that $\pi$ 
+* [x] Make complex valued layer able to learn frequencied greater than $\pi$ 
 * [ ] Implement BACON
 * [ ] Implement ground truth SDF supervision
 * [ ] Implement [Critical Regularizations for Neural Surface Reconstruction in the Wild](https://arxiv.org/abs/2206.03087)
