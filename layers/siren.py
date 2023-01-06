@@ -6,7 +6,6 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 
 from layers.initializers import (
-    Initializer,
     SirenInitializer,
     SirenUniformInitializer,
 )

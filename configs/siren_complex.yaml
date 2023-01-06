@@ -30,11 +30,10 @@ model:
       out_features: 1
       outermost_linear: True
       first_layer_init:
-        class_path: layers.initializers.SirenUniformInitializer
+        class_path: layers.initializers.SirenNormalInitializer
         init_args:
           omega: 30.0
-          is_first: True
-          # std: 2.2
+          is_first: true
       hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
@@ -60,7 +59,7 @@ model:
     class_path: losses.MarginLoss
     init_args: 
       weight: 30.0
-      margin: 0.0025
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 1e-2
@@ -79,7 +78,7 @@ data:
       samples_per_epoch: 10240000
       add_vertices: true
       device: cpu
-  batch_size: 20000
+  batch_size: 30000
 
 
 # Path/URL of the checkpoint from which training is resumed. If there is

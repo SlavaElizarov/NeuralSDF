@@ -133,7 +133,7 @@ class MarginLoss(OffSurfaceLoss):
         self.margin = margin
 
     def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
-        return (F.relu(self.margin * 2 - F.relu(distances)) * 100).mean()
+        return (F.relu(self.margin - F.relu(distances)) * 100).mean()
 
 class CoareaLoss(OffSurfaceLoss):
     def __init__(self, weight: float = 1.0, beta: float = 0.1):

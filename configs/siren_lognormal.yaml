@@ -59,7 +59,7 @@ model:
     class_path: losses.MarginLoss
     init_args: 
       weight: 30.0
-      margin: 0.0025
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 3e-2
@@ -82,7 +82,7 @@ data:
       samples_per_epoch: 10240000
       add_vertices: true
       device: cpu
-  batch_size: 20000
+  batch_size: 30000
 
 
 
@@ -94,8 +94,12 @@ ckpt_path:
 
 # Customize every aspect of training via flags
 trainer:
-  default_root_dir: logs/siren_lognormal
-  logger: true
+  default_root_dir:
+  logger: 
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: logs
+      name: siren_lognormal
   enable_checkpointing: true
 
   # Add a callback or list of callbacks.
