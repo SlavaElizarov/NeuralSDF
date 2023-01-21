@@ -88,8 +88,12 @@ ckpt_path:
 
 # Customize every aspect of training via flags
 trainer:
-  default_root_dir: logs/siren
-  logger: true
+  default_root_dir:
+  logger: 
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: logs
+      name: siren
   enable_checkpointing: true
 
 

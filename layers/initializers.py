@@ -6,7 +6,9 @@ import numpy as np
 
 class Initializer(ABC):
     def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
-        return self.initialize(tensor)
+        initialized_tensor = self.initialize(tensor)
+        assert initialized_tensor.data_ptr() == tensor.data_ptr()
+        return initialized_tensor
 
     def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
@@ -73,7 +75,6 @@ class SirenLogNormalInitializer(SirenInitializer):
     def __init__(self, omega: float = 30.0, std: float = 2.2):
         """
         Fill the weights with values from a log normal distribution
-        Modification of the method described in paper: https://arxiv.org/abs/2006.09661
 
         Args:
             omega (float): omega is a frequency factor which simply multiplies
@@ -91,4 +92,32 @@ class SirenLogNormalInitializer(SirenInitializer):
             tensor = tensor.log_normal_(std=self.std)
             tensor[: out // 2] *= -1
             tensor /= self.omega
+            return tensor
+
+
+class IsotropicLogNormalInitializer(SirenInitializer):
+    def __init__(self, omega: float = 30.0, std: float = 2.2):
+        """
+        Fill the weights with values from a log normal distribution
+
+        Args:
+            omega (float): omega is a frequency factor which simply multiplies
+                                        the features before the nonlinearity.
+                                        Different signals may require different omega in the first layer.
+
+        """
+        super().__init__(omega)
+        self.std = std
+
+    def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
+        assert tensor.ndim == 2
+        output_dim, input_dim = tensor.shape
+        
+        with torch.no_grad():
+            tensor = nn.init.normal_(tensor, 0, 1 / np.sqrt(3) / input_dim)
+            norm = torch.norm(tensor, dim=1, keepdim=True)
+            lenghs = torch.zeros(output_dim, 1)
+            lenghs = lenghs.log_normal_(std=self.std)
+            tensor.mul_(lenghs / norm / self.omega)
+            
             return tensor

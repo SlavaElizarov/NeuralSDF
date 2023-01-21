@@ -145,6 +145,16 @@ class CoareaLoss(OffSurfaceLoss):
         grad_norm = torch.linalg.norm(gradients, ord=2, dim=-1)
         return (laplace_pdf * grad_norm).mean()
 
+# TODO: investigate this loss, possibly it is not correct
+class VolumeLoss(OffSurfaceLoss):
+    def __init__(self, weight: float = 1.0, beta: float = 0.01):
+        super().__init__(weight=weight, name=f"offsurface_volume")
+        self.beta = beta
+
+    def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
+        volume = torch.exp(-F.relu(distances) / self.beta)
+        return volume.mean()
+
 class DivergenceLoss(LaplacianLoss):
     def __init__(self, weight: float = 1.0):
         """
