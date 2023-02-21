@@ -112,12 +112,12 @@ class IsotropicLogNormalInitializer(SirenInitializer):
     def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
         assert tensor.ndim == 2
         output_dim, input_dim = tensor.shape
-        
+
         with torch.no_grad():
             tensor = nn.init.normal_(tensor, 0, 1 / np.sqrt(3) / input_dim)
             norm = torch.norm(tensor, dim=1, keepdim=True)
             lenghs = torch.zeros(output_dim, 1)
             lenghs = lenghs.log_normal_(std=self.std)
             tensor.mul_(lenghs / norm / self.omega)
-            
+
             return tensor

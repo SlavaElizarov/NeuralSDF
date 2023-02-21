@@ -26,7 +26,6 @@ class LossBase(ABC):
         self._log(self.name, loss_value)
         return loss_value
 
-
     def set_logger(self, logger: Callable[[str, torch.Tensor], None]):
         self._logger = logger
 
@@ -56,7 +55,9 @@ class OffSurfaceLoss(LossBase, ABC):
 
 
 class LaplacianLoss(LossBase, ABC):
-    def _loss(self, y: torch.Tensor, laplacian: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
+    def _loss(
+        self, y: torch.Tensor, laplacian: torch.Tensor, gradients: torch.Tensor
+    ) -> torch.Tensor:
         return torch.abs(gradients).mean()
 
     def __call__(
@@ -78,7 +79,7 @@ class GradientDirectionLoss(LossBase):
 
     def _loss(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("This method should be implemented in __init__")
-    
+
     def _loss_cos(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         return (1 - torch.abs(F.cosine_similarity(gradient, normals, dim=-1))).mean()
 
@@ -109,7 +110,8 @@ class EikonalLoss(LossBase):
         grad_norm = torch.linalg.norm(gradient, ord=2, dim=-1)
         # return torch.square(grad_norm - 1).mean()
         return torch.abs(grad_norm - 1).mean()
-    
+
+
 class ViscosityLoss(LaplacianLoss):
     def __init__(self, weight: float = 1.0, epsilon: float = 0.01):
         """
@@ -122,11 +124,16 @@ class ViscosityLoss(LaplacianLoss):
         """
         super().__init__(weight=weight, name=f"Viscosity")
         self.epsilon = epsilon
-    
-    def _loss(self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+
+    def _loss(
+        self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor
+    ) -> torch.Tensor:
         grad_norm = torch.linalg.norm(gradients, ord=2, dim=-1)
-        return torch.square((grad_norm - 1) * torch.sign(y) - self.epsilon * laplacian).mean()
-        
+        return torch.square(
+            (grad_norm - 1) * torch.sign(y) - self.epsilon * laplacian
+        ).mean()
+
+
 class MarginLoss(OffSurfaceLoss):
     def __init__(self, weight: float = 1.0, margin: float = 0.1):
         super().__init__(weight=weight, name=f"offsurface_margin")
@@ -134,6 +141,7 @@ class MarginLoss(OffSurfaceLoss):
 
     def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
         return (F.relu(self.margin - F.relu(distances)) * 100).mean()
+
 
 class CoareaLoss(OffSurfaceLoss):
     def __init__(self, weight: float = 1.0, beta: float = 0.1):
@@ -145,6 +153,7 @@ class CoareaLoss(OffSurfaceLoss):
         grad_norm = torch.linalg.norm(gradients, ord=2, dim=-1)
         return (laplace_pdf * grad_norm).mean()
 
+
 # TODO: investigate this loss, possibly it is not correct
 class VolumeLoss(OffSurfaceLoss):
     def __init__(self, weight: float = 1.0, beta: float = 0.01):
@@ -154,6 +163,7 @@ class VolumeLoss(OffSurfaceLoss):
     def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
         volume = torch.exp(-F.relu(distances) / self.beta)
         return volume.mean()
+
 
 class DivergenceLoss(LaplacianLoss):
     def __init__(self, weight: float = 1.0):
@@ -178,5 +188,10 @@ class DivergenceLoss(LaplacianLoss):
         """
         super().__init__(weight=weight, name=f"divergence")
 
-    def _loss(self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor,) -> torch.Tensor:
+    def _loss(
+        self,
+        laplacian: torch.Tensor,
+        gradients: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
         return torch.abs(laplacian).mean()

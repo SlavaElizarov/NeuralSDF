@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 
 from training.dataset import MeshDataset
 
+
 class SdfDataModule(pl.LightningDataModule):
     def __init__(
         self,

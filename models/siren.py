@@ -84,7 +84,7 @@ class ComplexSiren(Siren):
             init_scheme=first_layer_init,
         )
         self[0] = first_layer
-        
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + 1.0  # TODO: Remove this hack
         return super().forward(x)

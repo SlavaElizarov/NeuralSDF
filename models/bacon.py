@@ -54,7 +54,8 @@ class Bacon(SDF):
             z = l * g
 
         return self.final_layer(z)
-    
+
+
 class ComplexBacon(SDF):
     def __init__(
         self,
@@ -82,7 +83,9 @@ class ComplexBacon(SDF):
                     in_features=in_features,
                     out_features=hidden_dim,
                     add_bias=True,
-                    init_scheme=SirenUniformInitializer(omega=omega_per_layer, is_first=True)
+                    init_scheme=SirenUniformInitializer(
+                        omega=omega_per_layer, is_first=True
+                    ),
                 )
             )
             if i != 0:
@@ -94,7 +97,7 @@ class ComplexBacon(SDF):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + 1.0
-        
+
         z = self.fourier_layers[0](x)
         for i in range(1, self.hidden_layers):
             l = self.linear_layers[i - 1](z)
