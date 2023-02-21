@@ -1,16 +1,52 @@
-# NeuralSDF
+# Neural Surface
 
-NeuralSDF is a library for reconstructing implicit 3D surface from meshes and point clouds.
+## Surface reconstruction and generation with neural fields
 
 <p align="center">
   <img src="car.gif" alt="sdf" />
 </p>
 
+Signed distance field (SDF) reconstruction of the 
+Frazer Nash Supersport 1929 model provided by [Achmad Sarifudin](https://www.blendswap.com/blend/30188). 
 
+
+## Description
+
+This repository contains a range of models that can be used for surface reconstruction and generation, based on [neural fields](https://arxiv.org/abs/2111.11426). 
+
+We highly recommend to read this survey [Neural Fields in Visual Computing and Beyond](https://arxiv.org/abs/2111.11426) to get a better understanding of the field.
+
+The models've been unified and consolidated into one place for convenient comparison and experimentation. Each model has been implemented as a separate class, allowing for easy integration into your own projects. Additionally, for each model, a configuration file including all parameters is provided, as well as a training script.
+
+This repository uses of [PyTorch Lightning](https://www.pytorchlightning.ai/) for training, and Lightning CLI for configuration, which adds to its utility and ease of use.
+
+## Installation
+
+All dependencies are listed in the requirements.txt file. To install them, run the following command:
+
+```pip install -r requirements.txt```
+
+Enjoy!
+
+## Usage
 
 To train a model use the folowing command:
 
 ```python train_sdf.py fit -c configs/config.yaml```
+
+### Configs
+
+All configs are located in the configs folder. Each model has its own config file. The config file contains all the parameters of the model, as well as the training process.
+
+table of configs:
+
+| Model | Config |
+| --- | --- |
+| [Implicit Neural Representations with Periodic Activation Functions](https://arxiv.org/abs/2006.09661) | [config](configs/config.yaml) |
+| [DiGS : Divergence guided shape implicit neural representation for unoriented point clouds](https://arxiv.org/abs/2106.10811) | [config](configs/digs.yaml) |
+| [Modulated Periodic Activations for Generalizable Local Functional Representations](https://arxiv.org/abs/2104.03960) | [config](configs/mpa.yaml) |
+| [Implicit geometric regularization for learning shapes](https://arxiv.org/abs/2002.10099) | [config](configs/igr.yaml) |
+
 
 
 ### Following papers are implemented (partially):
