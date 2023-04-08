@@ -9,7 +9,7 @@ seed_everything: 42
 optimizer:
   class_path: torch.optim.Adam
   init_args:
-    lr: 0.00005
+    lr: 0.00011
     amsgrad: false
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
@@ -72,10 +72,10 @@ data:
   dataset:
     class_path: training.dataset.MeshDataset
     init_args: 
-      model_path: /home/duke/store/datasets/objaverse/hf-objaverse-v1/glbs/000-112/d89f7d5a37ef43119e7b6c37b41c69cb.glb
-      number_of_samples: 3240000
-      add_vertices: false
-  batch_size: 20000
+      model_path: /home/duke/store/datasets/objaverse/hf-objaverse-v1/glbs/000-011/f82f40ca04d84a24868a453c4e3a16c2.glb
+      number_of_samples: 4240000
+      add_vertices: true
+  batch_size: 80000
 
 
 
@@ -219,7 +219,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 32
+  precision: 16
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)
