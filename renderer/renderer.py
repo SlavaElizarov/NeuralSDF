@@ -22,7 +22,7 @@ class SphereTracingRenderer:
         origin, directions = self.camera.emit_rays()
 
         points = torch.zeros_like(directions, requires_grad=False)
-        t = torch.zeros(directions.shape[0], dtype=torch.float32).to(self.camera.device)
+        t = torch.zeros(directions.shape[0], dtype=directions.dtype).to(self.camera.device)
 
         is_hit = torch.zeros_like(t).bool()  # is_hit[i] is True if ray i hits a surface
         # condition[i] is True if computation should continue for ray i

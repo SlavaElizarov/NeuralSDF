@@ -5,15 +5,13 @@ import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-from pytorch3d.structures import Meshes
-from pytorch3d.io import load_objs_as_meshes
-from pytorch3d.ops import sample_points_from_meshes
+import open3d as o3d
+from open3d.geometry import TriangleMesh
 
 from utils import LatinHypercubeSampler
 
-
 class MeshSampler(ABC):
-    def __init__(self, mesh: Meshes):
+    def __init__(self, mesh: TriangleMesh):
         self.mesh = mesh
 
     def sample(self, num_samples: int) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -24,75 +22,85 @@ class MeshSampler(ABC):
 
 
 class UniformMeshSampler(MeshSampler):
-    def sample(self, num_samples: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        samples = sample_points_from_meshes(
-            self.mesh, num_samples=num_samples, return_normals=True
-        )
-        assert len(samples) == 2
-        points, normals = samples
+    def sample(self, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
+        pointcloud = self.mesh.sample_points_uniformly(num_samples) # type: ignore
+        points = np.asarray(pointcloud.points, dtype=np.float32)
+        normals = np.asarray(pointcloud.normals, dtype=np.float32)
         return points, normals
 
 
 class MeshDataset(Dataset):
     def __init__(
         self,
-        mesh_path: str,
-        samples_per_epoch: int = 1000,
+        model_path: str,
         add_vertices: bool = True,
-        device: str = "cuda",
+        number_of_samples: int = 1000000,
     ):
-        assert os.path.exists(mesh_path)
-        assert mesh_path.endswith(".obj")
-        assert samples_per_epoch > 0
-        assert device in ["cuda", "cpu"]
+        assert os.path.exists(model_path)
 
-        self.device = device
-        self.mesh_filepath = mesh_path
-        self.samples_per_epoch = samples_per_epoch
+        self.mesh_filepath = model_path
         self.add_vertices = add_vertices
-        self.mesh: Meshes = self._load_mesh(mesh_path)
+        self.number_of_samples = number_of_samples
+        
+        self.mesh = self._load_mesh(self.mesh_filepath)
         self.mesh_sampler = UniformMeshSampler(self.mesh)
         self.space_sampler = LatinHypercubeSampler(
-            np.array([[-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]])
+            np.array([[-1.1, 1.1], [-1.1, 1.1], [-1.1, 1.1]])
         )
 
-        self._surface_points: torch.Tensor
-        self._normals: torch.Tensor
-        self._off_surface_points: torch.Tensor
+        self._surface_points: np.ndarray
+        self._normals: np.ndarray
+        self._off_surface_points: np.ndarray
         self.resample()
 
     def _load_mesh(self, mesh_filepath: str):
-        meshes = load_objs_as_meshes([mesh_filepath], device=self.device)
-        return self._normalize_to_unit_sphere(meshes)
+        model = o3d.io.read_triangle_model(mesh_filepath) 
+        
+        # next is heuristics to remove redundant geometry
+        mesh = None
+        for submodel in model.meshes:
+            verts = np.asarray(submodel.mesh.vertices)
+            # remove floating planes
+            if len(verts) == 4:
+                continue
+            # remove vertcal 2d geometry
+            if np.allclose(verts[:, 1], 0) or np.all(verts[:, 1] == verts[0, 1]):
+                print(submodel.mesh_name)
+                continue
+            if mesh is None:
+                mesh = submodel.mesh
+            else:
+                mesh += submodel.mesh
+
+        return self._normalize_to_unit_sphere(mesh) # type: ignore
 
     def resample(self):
-        points, normals = self.mesh_sampler(self.samples_per_epoch)
-        points, normals = points[0], normals[0]
+        points, normals = self.mesh_sampler(self.number_of_samples)
         if self.add_vertices:
-            points = torch.cat([points, self.mesh.verts_packed()], dim=0)  # type: ignore
-            normals = torch.cat([normals, self.mesh.verts_normals_packed()], dim=0)  # type: ignore
+            points = np.concatenate([points, self.mesh.vertices], axis=0)  # type: ignore
+            normals = np.concatenate([normals, self.mesh.vertex_normals], axis=0)  # type: ignore
 
-        self._surface_points = points
-        self._normals = normals
+        self._surface_points = points # type: ignore
+        self._normals = normals # type: ignore
+        
         self._off_surface_points = self.space_sampler(
-            self._surface_points.shape[0], device=self.device
-        )
+            self._surface_points.shape[0])
 
-    def _normalize_to_unit_sphere(self, meshes: Meshes) -> Meshes:
-        V: torch.Tensor = meshes.verts_packed()  # type: ignore
-        V_max, _ = torch.max(V, dim=0)
-        V_min, _ = torch.min(V, dim=0)
-        V_center = (V_max + V_min) / 2.0
-        meshes.offset_verts_(V_center * -1)
+    def _normalize_to_unit_sphere(self, mesh: TriangleMesh) -> TriangleMesh:
+        v_max = np.max(mesh.vertices, axis=0)
+        v_min = np.min(mesh.vertices, axis=0)
+        v_center = (v_max + v_min) / 2.0
+        mesh.translate(-v_center)
 
-        V = meshes.verts_packed()  # type: ignore
+        v = np.asanyarray(mesh.vertices)
 
         # Find the max distance to origin
-        max_dist = torch.sqrt(torch.max(torch.sum(V**2, dim=-1)))
-        V_scale = 1.0 / max_dist
-        meshes.scale_verts_(V_scale.item())
+        max_dist = np.sqrt(np.max(np.sum(v**2, axis=-1)))
+        v_scale = 1.0 / max_dist
+        print(v_scale)
+        mesh.scale(v_scale, center=(0, 0, 0))
 
-        return meshes
+        return mesh
 
     def __len__(self):
         return self._surface_points.shape[0]
