@@ -77,8 +77,8 @@ class MeshDataset(Dataset):
     def resample(self):
         points, normals = self.mesh_sampler(self.number_of_samples)
         if self.add_vertices:
-            points = np.concatenate([points, self.mesh.vertices], axis=0)  # type: ignore
-            normals = np.concatenate([normals, self.mesh.vertex_normals], axis=0)  # type: ignore
+            points = np.concatenate([points, self.mesh.vertices], axis=0, dtype=points.dtype)  # type: ignore
+            normals = np.concatenate([normals, self.mesh.vertex_normals], axis=0, dtype=normals.dtype)  # type: ignore
 
         self._surface_points = points # type: ignore
         self._normals = normals # type: ignore
