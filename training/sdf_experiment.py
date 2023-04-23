@@ -22,11 +22,10 @@ class SdfExperiment(pl.LightningModule):
         level_set_loss: SurfaceLoss,
         eikonal_loss: EikonalLoss,
         grad_direction_loss: Optional[GradientDirectionLoss],
-        offsurface_loss: OffSurfaceLoss,
+        offsurface_loss: Optional[OffSurfaceLoss] = None,
         laplacian_loss: Optional[LaplacianLoss] = None,
     ):
         super().__init__()
-
         self.sdf_model = sdf_model
         self.level_set_loss = self._inject_logger(level_set_loss)
         self.eikonal_loss = self._inject_logger(eikonal_loss)
@@ -37,7 +36,7 @@ class SdfExperiment(pl.LightningModule):
         self.save_hyperparameters(ignore=["sdf_model"])
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-        surface_points, surface_normals, offsurface_points = batch
+        surface_points, surface_normals, offsurface_points, offsurface_distances_gt = batch
         batch_size = surface_points.shape[0]
 
         # we need to compute gradients for the points
@@ -81,8 +80,12 @@ class SdfExperiment(pl.LightningModule):
         # this loss aims to reduce a shadow geomtry around the surface
         if self.offsurface_loss is not None:
             loss += self.offsurface_loss(offsurface_distances, gradient[batch_size:])
+            
+        sdf_gt_loss = torch.nn.functional.l1_loss(offsurface_distances, offsurface_distances_gt[:, None])
+        loss += 10 * sdf_gt_loss
+        self.log('sdf_gt_loss', sdf_gt_loss, prog_bar=True)
 
-        self.log("loss", loss, prog_bar=True)  # TODO: find a way to remove this line
+        self.log("loss", loss, prog_bar=True) 
         return loss
 
     def _inject_logger(self, loss: T) -> T:
