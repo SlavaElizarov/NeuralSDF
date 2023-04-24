@@ -57,8 +57,11 @@ class SphereTracingRenderer:
             hit_points.requires_grad_(True)
             d = sdf(hit_points)
             (gradient,) = autograd.grad(outputs=d.sum(), inputs=hit_points)
-
-            frame[is_hit] = (
-                gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
-            ) * 0.5 + 0.5
+            
+            normals = gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
+            # TODO: fix camera
+            color = torch.einsum('ik,ik->i', normals, self.camera.project(-directions[is_hit].view(-1, 3)))
+            
+            frame[is_hit] = torch.stack([color]*3, dim=-1)
         return frame.reshape(self.camera.height, self.camera.width, 3)
+

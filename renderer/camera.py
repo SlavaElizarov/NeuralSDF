@@ -180,7 +180,7 @@ def look_at_view_transform(
     T = -torch.bmm(R.transpose(1, 2), C[:, :, None])[:, :, 0]
     return R, T
 
-
+# TODO: rewrite
 class Camera:
     def __init__(
         self,
@@ -229,6 +229,8 @@ class Camera:
         points = points @ self.rotation[0]  # + self.origin
         return points
 
+    # TODO: there is a bug here
+    # Origin should be the camera position, not the origin
     def emit_rays(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Emit rays from the camera's position.
