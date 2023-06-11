@@ -9,7 +9,7 @@ seed_everything: 42
 optimizer:
   class_path: torch.optim.Adam
   init_args:
-    lr: 0.0002
+    lr: 0.00014
     amsgrad: true
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
@@ -28,9 +28,9 @@ model:
       out_features: 1
       outermost_linear: True
       first_layer_init:
-        class_path: layers.initializers.SirenCorrelatedInitializer
+        class_path: layers.initializers.SirenUniformInitializer
         init_args:
-          omega: 90.0
+          omega: 60.0
           is_first: True
       hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
@@ -53,10 +53,10 @@ model:
       weight: 3.0
       type: cos
 
-  offsurface_gt_loss:
-    class_path: losses.OffSurfaceGTLoss
-    init_args: 
-      weight: 30.0
+  # offsurface_gt_loss:
+  #   class_path: losses.OffSurfaceGTLoss
+  #   init_args: 
+  #     weight: 30.0
 
   offsurface_loss:
     class_path: losses.MarginLoss
