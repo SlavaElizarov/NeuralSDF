@@ -57,7 +57,7 @@ class MeshDataset(Dataset):
         self.resample()
 
     def _load_mesh(self, mesh_filepath: str):
-        model = o3d.io.read_triangle_model(mesh_filepath) 
+        model = o3d.io.read_triangle_model(mesh_filepath)
         
         # next is heuristics to remove redundant geometry
         mesh = None

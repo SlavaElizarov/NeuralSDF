@@ -53,6 +53,15 @@ class OffSurfaceLoss(LossBase, ABC):
     ) -> torch.Tensor:
         return super().__call__(distances, gradients)
 
+class OffSurfaceGTLoss(LossBase):
+    def __init__(self, weight: float = 1.0):
+        super().__init__(weight=weight, name=f"offsurface_gt")
+
+    def _loss(self, distances: torch.Tensor, distances_gt: torch.Tensor) -> torch.Tensor:
+        return  torch.nn.functional.l1_loss(distances, distances_gt[:, None])
+
+    def __call__(self, distances: torch.Tensor, distances_gt: torch.Tensor) -> torch.Tensor:
+        return super().__call__(distances, distances_gt)
 
 class LaplacianLoss(LossBase, ABC):
     def _loss(

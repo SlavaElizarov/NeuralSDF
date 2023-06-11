@@ -7,6 +7,7 @@ from losses.losses import (
     GradientDirectionLoss,
     LaplacianLoss,
     LossBase,
+    OffSurfaceGTLoss,
     OffSurfaceLoss,
     SurfaceLoss,
 )
@@ -24,6 +25,7 @@ class SdfExperiment(pl.LightningModule):
         grad_direction_loss: Optional[GradientDirectionLoss],
         offsurface_loss: Optional[OffSurfaceLoss] = None,
         laplacian_loss: Optional[LaplacianLoss] = None,
+        offsurface_gt_loss: Optional[OffSurfaceGTLoss] = None,
     ):
         super().__init__()
         self.sdf_model = sdf_model
@@ -32,6 +34,7 @@ class SdfExperiment(pl.LightningModule):
         self.grad_direction_loss = self._inject_logger(grad_direction_loss)
         self.offsurface_loss = self._inject_logger(offsurface_loss)
         self.laplacian_loss = self._inject_logger(laplacian_loss)
+        self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
@@ -80,10 +83,9 @@ class SdfExperiment(pl.LightningModule):
         # this loss aims to reduce a shadow geomtry around the surface
         if self.offsurface_loss is not None:
             loss += self.offsurface_loss(offsurface_distances, gradient[batch_size:])
-            
-        sdf_gt_loss = torch.nn.functional.l1_loss(offsurface_distances, offsurface_distances_gt[:, None])
-        loss += 10 * sdf_gt_loss
-        self.log('sdf_gt_loss', sdf_gt_loss, prog_bar=True)
+
+        if self.offsurface_gt_loss is not None:
+            loss += self.offsurface_gt_loss(offsurface_distances, offsurface_distances_gt)
 
         self.log("loss", loss, prog_bar=True) 
         return loss
