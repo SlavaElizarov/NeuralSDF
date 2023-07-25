@@ -83,14 +83,19 @@ class GradientDirectionLoss(LossBase):
             self._loss = self._loss_cos
         elif type == "l1":
             self._loss = self._loss_l1
+        elif type == "monosdf":
+            self._loss = self._loss_monosdf
         else:
             raise NotImplementedError(f"Loss {type} is not implemented")
 
     def _loss(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("This method should be implemented in __init__")
+    
+    def _loss_monosdf(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
+        return self._loss_cos(gradient, normals) + self._loss_l1(gradient, normals)
 
     def _loss_cos(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
-        return (1 - torch.abs(F.cosine_similarity(gradient, normals, dim=-1))).mean()
+        return (1 - F.cosine_similarity(gradient, normals, dim=-1)).mean()
 
     def _loss_l1(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         return F.l1_loss(gradient, normals, reduction="mean")
@@ -100,8 +105,9 @@ class GradientDirectionLoss(LossBase):
 
 
 class EikonalLoss(LossBase):
-    def __init__(self, weight: float = 1.0):
+    def __init__(self, weight: float = 1.0, type: str = "l1"):
         super().__init__(weight=weight, name=f"eikonal")
+        self.type = type
 
     def _loss(self, gradient: torch.Tensor) -> torch.Tensor:
         """
@@ -117,8 +123,12 @@ class EikonalLoss(LossBase):
             torch.Tensor: l1 loss between the gradient norm and 1
         """
         grad_norm = torch.linalg.norm(gradient, ord=2, dim=-1)
-        # return torch.square(grad_norm - 1).mean()
-        return torch.abs(grad_norm - 1).mean()
+        if self.type == "l2":
+            return torch.square(grad_norm - 1).mean()
+        elif self.type == "l1":
+            return torch.abs(grad_norm - 1).mean()
+        else:
+            raise NotImplementedError(f"Loss {self.type} is not implemented")
 
 
 class ViscosityLoss(LaplacianLoss):
@@ -149,7 +159,7 @@ class MarginLoss(OffSurfaceLoss):
         self.margin = margin
 
     def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
-        return (F.relu(self.margin - F.relu(distances)) * 100).mean()
+        return (F.relu(self.margin - torch.abs(distances)) * 100).mean()
 
 
 class CoareaLoss(OffSurfaceLoss):

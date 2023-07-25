@@ -61,6 +61,9 @@ class SdfExperiment(pl.LightningModule):
             create_graph=True,
         )
 
+        surface_grad = gradient[:batch_size]
+        offsurface_grad = gradient[batch_size:]
+
         # SDF must be 0 at the boundary
         # Most of works adopt l1 loss for this task, so we do the same
         loss = self.level_set_loss(surface_distances)
@@ -71,7 +74,6 @@ class SdfExperiment(pl.LightningModule):
 
         if self.grad_direction_loss is not None:
             # SDF gradient must be directed towards the surface normal
-            surface_grad = gradient[:batch_size]  # gradient wrt surface points
             loss += self.grad_direction_loss(surface_grad, surface_normals)
 
         # Unfortunately, losses above are not always enough to make distance field smooth and consistent
@@ -82,7 +84,7 @@ class SdfExperiment(pl.LightningModule):
         # SDF must be positive outside the surface
         # this loss aims to reduce a shadow geomtry around the surface
         if self.offsurface_loss is not None:
-            loss += self.offsurface_loss(offsurface_distances, gradient[batch_size:])
+            loss += self.offsurface_loss(offsurface_distances, offsurface_grad)
 
         if self.offsurface_gt_loss is not None:
             loss += self.offsurface_gt_loss(offsurface_distances, offsurface_distances_gt)

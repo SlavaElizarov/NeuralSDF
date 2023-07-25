@@ -11,7 +11,7 @@ seed_everything: 42
 optimizer:
   class_path: torch.optim.Adam
   init_args:
-    lr: 0.00011
+    lr: 0.00025
     amsgrad: false
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
@@ -25,11 +25,11 @@ model:
     class_path: models.bacon.Bacon
     init_args: 
       in_features: 3
-      hidden_dim: 128
+      hidden_dim: 256
       hidden_layers: 8
       out_features: 1
       omega_max: 256
-      quantization: 64
+      quantization: 1024
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -47,11 +47,20 @@ model:
       weight: 3.0
       type: cos
 
+  offsurface_gt_loss:
+    class_path: losses.OffSurfaceGTLoss
+    init_args: 
+      weight: 30.0
+
   offsurface_loss:
     class_path: losses.MarginLoss
     init_args: 
-      weight: 30.0
+      weight: 10.0
       margin: 0.005
+    # class_path: losses.CoareaLoss
+    # init_args: 
+    #   weight: 3e-2
+    #   beta: 0.005
 
   laplacian_loss:
   
@@ -62,11 +71,10 @@ data:
   dataset:
     class_path: training.dataset.MeshDataset
     init_args: 
-      mesh_path: data/frazer-nash-super-sport-1929.obj
-      samples_per_epoch: 10240000
+      model_path: data/frazer-nash-super-sport-1929.obj
+      number_of_samples: 10240000
       add_vertices: true
-      device: cpu
-  batch_size: 20000
+  batch_size: 40000
 
 
 
@@ -83,14 +91,15 @@ trainer:
     class_path: pytorch_lightning.loggers.TensorBoardLogger
     init_args:
       save_dir: logs
-      name: bacon
+      name: siren
   enable_checkpointing: true
+
 
   # Add a callback or list of callbacks.
   # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.RenderingCalback)
   callbacks: 
     - callbacks.RenderingCalback
-    - callbacks.ActivationDistributionCalback
+    # - callbacks.ActivationDistributionCalback
     - callbacks.ResampleCallback
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
@@ -115,14 +124,6 @@ trainer:
   devices: 1
 
 
-  # If enabled and ``gpus`` or ``devices`` is an integer, pick available
-  # gpus automatically. This is especially useful when
-  # GPUs are configured to be in "exclusive mode", such
-  # that only one process at a time can access them.
-  # Default: ``False``. (type: bool, default: False)
-  auto_select_gpus: true
-
-
   # Whether to enable to progress bar by default.
   # Default: ``True``. (type: bool, default: True)
   enable_progress_bar: true
@@ -131,10 +132,6 @@ trainer:
   # Default: ``0.0``. (type: Union[int, float], default: 0.0)
   overfit_batches: 0.0
 
-  # -1 no tracking. Otherwise tracks that p-norm. May be set to 'inf' infinity-norm. If using
-  # Automatic Mixed Precision (AMP), the gradients will be unscaled before logging them.
-  # Default: ``-1``. (type: Union[int, float, str], default: -1)
-  track_grad_norm: 2
 
   # Perform a validation loop every after every `N` training epochs. If ``None``,
   # validation will be done solely based on the number of training batches, requiring ``val_check_interval``
@@ -149,7 +146,7 @@ trainer:
 
   # Accumulates grads every k batches or as set up in the dict.
   # Default: ``None``. (type: Union[int, Dict[int, int], null], default: null)
-  accumulate_grad_batches:
+  accumulate_grad_batches: 1
 
   # Stop training once this number of epochs is reached. Disabled by default (None).
   # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
@@ -212,7 +209,7 @@ trainer:
   # Supports different training strategies with aliases
   # as well custom strategies.
   # Default: ``None``. (type: Union[str, Strategy, null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin)
-  strategy:
+  strategy: auto
 
   # Synchronize batch norm layers between process groups/whole world.
   # Default: ``False``. (type: bool, default: False)
@@ -221,7 +218,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 32
+  precision: 16
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)
@@ -254,52 +251,8 @@ trainer:
   # Default: ``0``. (type: int, default: 0)
   reload_dataloaders_every_n_epochs: 0
 
-  # If set to True, will make trainer.tune() run a learning rate finder,
-  # trying to optimize initial learning for faster convergence. trainer.tune() method will
-  # set the suggested learning rate in self.lr or self.learning_rate in the LightningModule.
-  # To use a different key set a string instead of True with the key name.
-  # Default: ``False``. (type: Union[bool, str], default: False)
-  auto_lr_find: false
-
-  # Explicitly enables or disables sampler replacement. If not specified this
-  # will toggled automatically when DDP is used. By default it will add ``shuffle=True`` for
-  # train sampler and ``shuffle=False`` for val/test sampler. If you want to customize it,
-  # you can set ``replace_sampler_ddp=False`` and add your own distributed sampler. (type: bool, default: True)
-  replace_sampler_ddp: true
 
   # Enable anomaly detection for the autograd engine.
   # Default: ``False``. (type: bool, default: False)
   detect_anomaly: false
-
-  # If set to True, will `initially` run a batch size
-  # finder trying to find the largest batch size that fits into memory.
-  # The result will be stored in self.batch_size in the LightningModule.
-  # Additionally, can be set to either `power` that estimates the batch size through
-  # a power search or `binsearch` that estimates the batch size through a binary search.
-  # Default: ``False``. (type: Union[str, bool], default: False)
-  auto_scale_batch_size: false
-
-  # Plugins allow modification of core behavior like ddp and amp, and enable custom lightning plugins.
-  # Default: ``None``. (type: Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str, List[Union[Strategy, PrecisionPlugin, ClusterEnvironment, CheckpointIO, LayerSync, str]], null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin, pytorch_lightning.plugins.PrecisionPlugin, pytorch_lightning.plugins.precision.MixedPrecisionPlugin, pytorch_lightning.plugins.ApexMixedPrecisionPlugin, pytorch_lightning.plugins.NativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeNativeMixedPrecisionPlugin, pytorch_lightning.plugins.ShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.FullyShardedNativeMixedPrecisionPlugin, pytorch_lightning.plugins.DeepSpeedPrecisionPlugin, pytorch_lightning.plugins.DoublePrecisionPlugin, pytorch_lightning.plugins.HPUPrecisionPlugin, pytorch_lightning.plugins.IPUPrecisionPlugin, pytorch_lightning.plugins.TPUPrecisionPlugin, pytorch_lightning.plugins.TPUBf16PrecisionPlugin, pytorch_lightning.plugins.environments.BaguaEnvironment, pytorch_lightning.plugins.environments.KubeflowEnvironment, pytorch_lightning.plugins.environments.LightningEnvironment, pytorch_lightning.plugins.environments.LSFEnvironment, pytorch_lightning.plugins.environments.SLURMEnvironment, pytorch_lightning.plugins.environments.TorchElasticEnvironment, pytorch_lightning.plugins.environments.XLAEnvironment, pytorch_lightning.plugins.AsyncCheckpointIO, pytorch_lightning.plugins.TorchCheckpointIO, pytorch_lightning.plugins.HPUCheckpointIO, pytorch_lightning.plugins.XLACheckpointIO, pytorch_lightning.plugins.NativeSyncBatchNorm)
-  plugins:
-
-  # The mixed precision backend to use ("native" or "apex").
-  # Default: ``'native''``. (type: str, default: native)
-  amp_backend: native
-
-  # The optimization level to use (O1, O2, etc...). By default it will be set to "O2"
-  # if ``amp_backend`` is set to "apex". (type: Optional[str], default: null)
-  amp_level:
-
-  # Whether to force internal logged metrics to be moved to cpu.
-  # This can save some gpu memory, but can make training slower. Use with attention.
-  # Default: ``False``. (type: bool, default: False)
-  move_metrics_to_cpu: false
-
-  # How to loop over the datasets when there are multiple train loaders.
-  # In 'max_size_cycle' mode, the trainer ends one epoch when the largest dataset is traversed,
-  # and smaller datasets reload when running out of their data. In 'min_size' mode, all the datasets
-  # reload when reaching the minimum length of datasets.
-  # Default: ``"max_size_cycle"``. (type: str, default: max_size_cycle)
-  multiple_trainloader_mode: max_size_cycle
 
