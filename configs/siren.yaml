@@ -30,7 +30,7 @@ model:
       first_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
-          omega: 90.0
+          omega: 130.0
           is_first: true
       hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer

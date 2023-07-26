@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional, TypeVar
 import pytorch_lightning as pl
 import torch
@@ -15,6 +16,12 @@ from models.sdf import SDF
 
 T = TypeVar("T", bound=Optional[LossBase])
 
+class GradientParameters:
+    def __init__(self, force_numerical: bool = False, delta: float = 1e-3):
+        self.force_numerical = force_numerical
+        self.delta = delta
+
+
 
 class SdfExperiment(pl.LightningModule):
     def __init__(
@@ -26,6 +33,7 @@ class SdfExperiment(pl.LightningModule):
         offsurface_loss: Optional[OffSurfaceLoss] = None,
         laplacian_loss: Optional[LaplacianLoss] = None,
         offsurface_gt_loss: Optional[OffSurfaceGTLoss] = None,
+        grad_parameters: Optional[GradientParameters] = None,
     ):
         super().__init__()
         self.sdf_model = sdf_model
@@ -35,6 +43,7 @@ class SdfExperiment(pl.LightningModule):
         self.offsurface_loss = self._inject_logger(offsurface_loss)
         self.laplacian_loss = self._inject_logger(laplacian_loss)
         self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
+        self.grad_parameters = GradientParameters() if grad_parameters is None else grad_parameters
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
@@ -54,12 +63,10 @@ class SdfExperiment(pl.LightningModule):
         offsurface_distances = distances[batch_size:]
 
         # the gradient is needed for eikonal and direction losses
-        (gradient,) = autograd.grad(
-            outputs=distances.sum(),
-            inputs=points,
-            retain_graph=True,
-            create_graph=True,
-        )
+        # we can compute it numerically or analytically
+        gradient = self.sdf_model.get_gradient(points, 
+                                               self.grad_parameters.force_numerical, 
+                                               self.grad_parameters.delta)
 
         surface_grad = gradient[:batch_size]
         offsurface_grad = gradient[batch_size:]

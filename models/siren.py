@@ -90,10 +90,15 @@ class ModulatedSiren(Siren):
                                       requires_grad=True)
         nn.init.normal_(self.embedding, 0, 1e-2)
 
-        self.projection_layer = nn.Linear(embedding_features, hidden_dim, bias=True)
+        projection_layers =[]
+        for i in range(self.hidden_layers):
+            projection_layer = nn.Linear(embedding_features, hidden_dim, bias=True)
+            nn.init.zeros_(projection_layer.bias)
+            projection_layers.append(projection_layer)
+        self.projection_layers = nn.ModuleList(projection_layers)
+        # self.projection_layer = nn.Linear(embedding_features, hidden_dim, bias=True)
         # nn.init.zeros_(self.projection_layer.weight)
         # nn.init.ones_(self.projection_layer.bias)
-        nn.init.zeros_(self.projection_layer.bias)
 
 
 
@@ -106,13 +111,14 @@ class ModulatedSiren(Siren):
         
         # Reshape the features
         features = features.view(batch_size, self.embedding_features)
-        modulation = self.projection_layer(features)
+        # modulation = self.projection_layer(features)
         # points = points.view(batch_size, 3)
 
         for i in range(self.hidden_layers):
+            projection_layer = self.projection_layers[i]
             layer = self[i]
             # assert isinstance(layer, SirenLayer)
-            x = layer.forward(x, shift=modulation)
+            x = layer.forward(x, shift=projection_layer(features))
 
         return self[self.hidden_layers](x)
    

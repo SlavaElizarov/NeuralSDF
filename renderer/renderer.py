@@ -1,4 +1,5 @@
 from typing import Callable
+from models.sdf import SDF
 from renderer.camera import Camera
 import torch
 from torch import nn
@@ -18,7 +19,7 @@ class SphereTracingRenderer:
         self.max_depth = max_depth
         self.max_iteration = max_iteration
 
-    def render(self, sdf: Callable[[torch.Tensor], torch.Tensor]) -> torch.Tensor:
+    def render(self, sdf: SDF) -> torch.Tensor:
         origin, directions = self.camera.emit_rays()
 
         points = torch.zeros_like(directions, requires_grad=False)
@@ -56,7 +57,7 @@ class SphereTracingRenderer:
             hit_points = points[is_hit].clone()
             hit_points.requires_grad_(True)
             d = sdf(hit_points)
-            (gradient,) = autograd.grad(outputs=d.sum(), inputs=hit_points)
+            gradient = sdf.get_gradient(hit_points)
             
             normals = gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
             # TODO: fix camera

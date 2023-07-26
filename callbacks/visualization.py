@@ -3,6 +3,7 @@ import torch
 from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
 import pytorch_lightning as pl
+from models.sdf import SDF
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
 from training.sdf_experiment import SdfExperiment
@@ -14,7 +15,7 @@ class RenderingCalback(pl.Callback):
 
     def render(
         self,
-        get_distance: Callable[[torch.Tensor], torch.Tensor],
+        sdf_model: SDF,
         dist=1.2,
         elev=0,
         azim=0,
@@ -27,7 +28,7 @@ class RenderingCalback(pl.Callback):
         rend = SphereTracingRenderer(
             camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
         )
-        frame = rend.render(get_distance).detach()
+        frame = rend.render(sdf_model).detach()
         return frame
 
     def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
