@@ -51,7 +51,7 @@ class SDF(nn.Module, ABC):
         """
         assert x.ndim == 2
         assert x.shape[1] == 3
-
+        
         offsets = torch.as_tensor(
                             [
                                 [delta, 0.0, 0.0],
@@ -60,7 +60,8 @@ class SDF(nn.Module, ABC):
                                 [0.0, -delta, 0.0],
                                 [0.0, 0.0, delta],
                                 [0.0, 0.0, -delta],
-                            ]
+                            ],
+                            dtype=x.dtype,
                         ).to(x)
 
         x = x.unsqueeze(-2) + offsets.unsqueeze(0)

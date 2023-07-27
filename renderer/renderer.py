@@ -30,6 +30,7 @@ class SphereTracingRenderer:
         condition = torch.ones_like(t).bool()
         d = torch.zeros_like(t)  # distance to surface for ray i
 
+
         with torch.no_grad():
 
             for _ in range(self.max_iteration):
@@ -37,6 +38,7 @@ class SphereTracingRenderer:
                 points = origin + t[:, None] * directions  # move along ray on t units
                 # project points to camera coordinates
                 points = self.camera.project(points)
+
                 d[condition] = sdf(points[condition])[:, 0]
 
                 t = t + d

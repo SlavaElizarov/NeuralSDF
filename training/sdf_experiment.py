@@ -16,11 +16,11 @@ from models.sdf import SDF
 
 T = TypeVar("T", bound=Optional[LossBase])
 
+
 class GradientParameters:
     def __init__(self, force_numerical: bool = False, delta: float = 1e-3):
         self.force_numerical = force_numerical
         self.delta = delta
-
 
 
 class SdfExperiment(pl.LightningModule):
@@ -43,7 +43,8 @@ class SdfExperiment(pl.LightningModule):
         self.offsurface_loss = self._inject_logger(offsurface_loss)
         self.laplacian_loss = self._inject_logger(laplacian_loss)
         self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
-        self.grad_parameters = GradientParameters() if grad_parameters is None else grad_parameters
+        self.grad_parameters = GradientParameters(
+        ) if grad_parameters is None else grad_parameters
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
@@ -64,8 +65,8 @@ class SdfExperiment(pl.LightningModule):
 
         # the gradient is needed for eikonal and direction losses
         # we can compute it numerically or analytically
-        gradient = self.sdf_model.get_gradient(points, 
-                                               self.grad_parameters.force_numerical, 
+        gradient = self.sdf_model.get_gradient(points,
+                                               self.grad_parameters.force_numerical,
                                                self.grad_parameters.delta)
 
         surface_grad = gradient[:batch_size]
@@ -94,14 +95,16 @@ class SdfExperiment(pl.LightningModule):
             loss += self.offsurface_loss(offsurface_distances, offsurface_grad)
 
         if self.offsurface_gt_loss is not None:
-            loss += self.offsurface_gt_loss(offsurface_distances, offsurface_distances_gt)
-
-        self.log("loss", loss, prog_bar=True) 
+            loss += self.offsurface_gt_loss(offsurface_distances,
+                                            offsurface_distances_gt)
+        
+        self.log("loss", loss, prog_bar=True)
         return loss
 
     def _inject_logger(self, loss: T) -> T:
         if loss is not None:
-            loss.set_logger(lambda name, loss: self.log(name, loss, prog_bar=True))
+            loss.set_logger(lambda name, loss: self.log(
+                name, loss, prog_bar=True))
         return loss
 
     def divergence(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:

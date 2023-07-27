@@ -24,6 +24,6 @@ class SdfDataModule(pl.LightningDataModule):
             shuffle=True,
             pin_memory=True,
             prefetch_factor=4,
-            num_workers=8,
+            num_workers=16,
             persistent_workers=False,
         )

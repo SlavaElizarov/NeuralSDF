@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+import tinycudann as tcnn
 
 from layers import SirenLayer, ComplexExpLayer
 from layers.initializers import SirenInitializer, SirenUniformInitializer
@@ -86,9 +87,20 @@ class ModulatedSiren(Siren):
 
         self.embedding_resolution = embedding_resolution
         self.embedding_features = embedding_features
-        self.embedding = nn.Parameter(torch.zeros(1, embedding_features, embedding_resolution, embedding_resolution, embedding_resolution), 
-                                      requires_grad=True)
-        nn.init.normal_(self.embedding, 0, 1e-2)
+        # self.embedding = nn.Parameter(torch.zeros(1, embedding_features, embedding_resolution, embedding_resolution, embedding_resolution), 
+        #                               requires_grad=True)
+        # nn.init.normal_(self.embedding, 0, 1e-2)
+        encoding_config={
+                    "otype": "HashGrid" ,
+                    "n_levels": 16,
+                    "n_features_per_level": 8,
+                    "log2_hashmap_size": 19,
+                    "base_resolution": 16,
+                    "per_level_scale": 2.0,
+                    "interpolation": "Smoothstep",
+                }
+        self.encoding = tcnn.Encoding(in_features, encoding_config, dtype=torch.float32)
+
 
         projection_layers =[]
         for i in range(self.hidden_layers):
@@ -106,9 +118,10 @@ class ModulatedSiren(Siren):
         batch_size = points.shape[0]
         # Get the features at the points
         x = points
-        points = points.view(1 , batch_size, 1, 1, 3).detach() # (B, 1, 1, 3)
-        features = nn.functional.grid_sample(self.embedding, points, align_corners=False, padding_mode="border") 
-        
+        # points = points.view(1 , batch_size, 1, 1, 3).detach() # (B, 1, 1, 3)
+        # features = nn.functional.grid_sample(self.embedding, points, align_corners=False, padding_mode="border") 
+        features = self.encoding(points.detach())
+
         # Reshape the features
         features = features.view(batch_size, self.embedding_features)
         # modulation = self.projection_layer(features)

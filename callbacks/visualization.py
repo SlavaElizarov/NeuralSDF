@@ -24,12 +24,15 @@ class RenderingCalback(pl.Callback):
         device="cuda",
     ):
 
-        camera = Camera(dist, elev, azim, resolution=256, device=device)
+        camera = Camera(dist, elev, azim, resolution=256, device=device, half_precision=False)
         rend = SphereTracingRenderer(
             camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
         )
         frame = rend.render(sdf_model).detach()
         return frame
+    
+    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: SdfExperiment) -> None:
+        return self.on_train_epoch_end(trainer, pl_module)
 
     def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
         sdf_model = model.sdf_model
