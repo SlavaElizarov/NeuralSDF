@@ -28,12 +28,12 @@ model:
       embedding_resolution: 128
       embedding_features: 128
       out_features: 1
-      outermost_linear: True
+      outermost_linear: true
       first_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
           omega: 90.0
-          is_first: True
+          is_first: true
       hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
@@ -43,8 +43,8 @@ model:
   grad_parameters:
     class_path: training.sdf_experiment.GradientParameters
     init_args: 
-      force_numerical: False
-      delta: 0.01
+      force_numerical: false
+      delta: 0.06
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -79,6 +79,9 @@ model:
     #   beta: 0.005
 
   laplacian_loss:
+    class_path: losses.LaplacianLoss
+    init_args: 
+      weight: 1.0
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:

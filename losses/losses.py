@@ -64,14 +64,14 @@ class OffSurfaceGTLoss(LossBase):
         return super().__call__(distances, distances_gt)
 
 class LaplacianLoss(LossBase, ABC):
-    def _loss(
-        self, y: torch.Tensor, laplacian: torch.Tensor, gradients: torch.Tensor
-    ) -> torch.Tensor:
-        return torch.abs(gradients).mean()
+    def __init__(self, weight: float = 1.0):
+        super().__init__(weight=weight, name=f"laplacian_loss")
+
+    def _loss(self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return torch.abs(laplacian).mean()
 
     def __call__(
-        self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor
-    ) -> torch.Tensor:
+        self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return super().__call__(laplacian, gradients, y)
 
 

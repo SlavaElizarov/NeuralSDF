@@ -19,6 +19,7 @@ class MeshSampler(ABC):
 
     def __call__(self, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         return self.sample(num_samples)
+        
 
 
 class UniformMeshSampler(MeshSampler):
@@ -55,6 +56,10 @@ class MeshDataset(Dataset):
         self._off_surface_points: np.ndarray
         self._sdf_values: np.ndarray
         self.resample()
+
+        print(f"Number of surface points: {self._surface_points.shape[0]}")
+        print(f"Number of off surface points: {self._off_surface_points.shape[0]}")
+        print(f"Points lay in range: {np.min(self._off_surface_points, axis=0)} - {np.max(self._off_surface_points, axis=0)}")
 
     def _load_mesh(self, mesh_filepath: str):
         model = o3d.io.read_triangle_model(mesh_filepath)

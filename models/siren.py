@@ -116,6 +116,7 @@ class ModulatedSiren(Siren):
 
     def forward(self, points: torch.Tensor) -> torch.Tensor:
         batch_size = points.shape[0]
+        points = points / 2.2 + 0.5 # normalize to [0, 1]
         # Get the features at the points
         x = points
         # points = points.view(1 , batch_size, 1, 1, 3).detach() # (B, 1, 1, 3)
