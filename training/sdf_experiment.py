@@ -67,7 +67,8 @@ class SdfExperiment(pl.LightningModule):
         # we can compute it numerically or analytically
         gradient = self.sdf_model.get_gradient(points,
                                                self.grad_parameters.force_numerical,
-                                               self.grad_parameters.delta)
+                                               self.grad_parameters.delta,
+                                               distances)
 
         surface_grad = gradient[:batch_size]
         offsurface_grad = gradient[batch_size:]

@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+import tinycudann as tcnn
 import torch
 from torch import nn
 
@@ -12,13 +14,13 @@ class SDF(nn.Module, ABC):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         pass
 
-    def get_gradient(self, x: torch.Tensor, force_numerical: bool = False, delta: float = 1e-3) -> torch.Tensor:
+    def get_gradient(self, points: torch.Tensor, force_numerical: bool = False, delta: float = 1e-3, values: Optional[torch.Tensor] = None) -> torch.Tensor:
         if self.analytical_gradient_available and not force_numerical:
-            return self._analytical_gradient(x)
-        
-        return self._numerical_gradient(x, delta)
+            return self._analytical_gradient(points, values)
 
-    def _analytical_gradient(self, x: torch.Tensor) -> torch.Tensor:
+        return self._numerical_gradient(points, delta)
+
+    def _analytical_gradient(self, x: torch.Tensor, values: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Compute the autograd gradient of the SDF at the given points
         Args:
@@ -26,12 +28,13 @@ class SDF(nn.Module, ABC):
         Returns:
             torch.Tensor: gradient of the SDF at the given points
         """
-        
+
         input_requires_grad = x.requires_grad
         x.requires_grad_(True)
-        sdf = self.forward(x)
+        if values is None:
+            values = self.forward(x)
         (gradient,) = torch.autograd.grad(
-            outputs=sdf.sum(),
+            outputs=values.sum(),
             inputs=x,
             retain_graph=True,
             create_graph=self.training,
@@ -39,7 +42,7 @@ class SDF(nn.Module, ABC):
         if not input_requires_grad:
             x.requires_grad_(False)
         return gradient
-    
+
     def _numerical_gradient(self, x: torch.Tensor, delta: float = 1e-3) -> torch.Tensor:
         """
         Compute the numerical gradient of the SDF at the given points
@@ -51,18 +54,18 @@ class SDF(nn.Module, ABC):
         """
         assert x.ndim == 2
         assert x.shape[1] == 3
-        
+
         offsets = torch.as_tensor(
-                            [
-                                [delta, 0.0, 0.0],
-                                [-delta, 0.0, 0.0],
-                                [0.0, delta, 0.0],
-                                [0.0, -delta, 0.0],
-                                [0.0, 0.0, delta],
-                                [0.0, 0.0, -delta],
-                            ],
-                            dtype=x.dtype,
-                        ).to(x)
+            [
+                [delta, 0.0, 0.0],
+                [-delta, 0.0, 0.0],
+                [0.0, delta, 0.0],
+                [0.0, -delta, 0.0],
+                [0.0, 0.0, delta],
+                [0.0, 0.0, -delta],
+            ],
+            dtype=x.dtype,
+        ).to(x)
 
         x = x.unsqueeze(-2) + offsets.unsqueeze(0)
 

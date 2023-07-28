@@ -59,7 +59,7 @@ class SphereTracingRenderer:
             hit_points = points[is_hit].clone()
             hit_points.requires_grad_(True)
             d = sdf(hit_points)
-            gradient = sdf.get_gradient(hit_points)
+            gradient = sdf.get_gradient(hit_points, values=d)
             
             normals = gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
             # TODO: fix camera

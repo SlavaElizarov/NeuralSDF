@@ -37,6 +37,12 @@ model:
         init_args:
           omega: 60.0
 
+  grad_parameters:
+    class_path: training.sdf_experiment.GradientParameters
+    init_args: 
+      force_numerical: true
+      delta: 0.01
+
   level_set_loss: 
     class_path: losses.SurfaceLoss
     init_args: 

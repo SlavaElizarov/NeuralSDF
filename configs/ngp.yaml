@@ -22,22 +22,27 @@ model:
   sdf_model:
     class_path: models.ngp.NgpSdf
     init_args: 
-      in_features: 3
       hidden_dim: 128
       hidden_layers: 4
       out_features: 1
-      num_levels: 16
-      features_per_level: 8
-      log2_hashmap_size: 19
-      base_resolution: 16
-      per_level_scale: 2.0
-      use_hash: True
+      encoding:
+        class_path: layers.encodings.GridEmbedding
+        init_args:
+          in_features: 3
+          num_levels: 16
+          features_per_level: 8
+          log2_hashmap_size: 19
+          base_resolution: 16
+          per_level_scale: 2.0
+          use_hash: true
+          hash_smoothstep: true
+          mask_k_levels: 8
 
   grad_parameters:
     class_path: training.sdf_experiment.GradientParameters
     init_args: 
-      force_numerical: True
-      delta: 0.01
+      force_numerical: true
+      delta: 0.001
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -47,14 +52,14 @@ model:
   eikonal_loss:
     class_path: losses.EikonalLoss
     init_args: 
-      weight: 5.0
+      weight: 2.0
       type: l2
 
   grad_direction_loss:
     class_path: losses.GradientDirectionLoss
     init_args: 
       weight: 3.0
-      type: monosdf
+      type: cos
 
   offsurface_gt_loss:
     class_path: losses.OffSurfaceGTLoss
@@ -64,14 +69,17 @@ model:
   # offsurface_loss:
   #   class_path: losses.MarginLoss
   #   init_args: 
-  #     weight: 5.0
+  #     weight: 30.0
   #     margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 3e-2
     #   beta: 0.005
 
-  laplacian_loss:
+  # laplacian_loss:
+  #   class_path: losses.LaplacianLoss
+  #   init_args: 
+  #     weight: 1.0
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
@@ -227,7 +235,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 16
+  precision: 32
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)

@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 from torch import nn
-import tinycudann as tcnn
 
 from layers import SirenLayer, ComplexExpLayer
+from layers.encodings import GridEmbedding
 from layers.initializers import SirenInitializer, SirenUniformInitializer
 from models.sdf import SDF
 
@@ -65,6 +65,7 @@ class ModulatedSiren(Siren):
         hidden_dim: int,
         hidden_layers: int,
         out_features: int,
+        encoding: GridEmbedding,
         outermost_linear: bool = False,
         first_layer_init: SirenInitializer = SirenUniformInitializer(
             omega=30.0, is_first=True
@@ -72,8 +73,6 @@ class ModulatedSiren(Siren):
         hidden_layer_init: SirenInitializer = SirenUniformInitializer(
             omega=30.0, is_first=False
         ),
-        embedding_resolution: int = 32,
-        embedding_features: int = 64,
     ):
         super().__init__(
             in_features,
@@ -84,49 +83,22 @@ class ModulatedSiren(Siren):
             first_layer_init,
             hidden_layer_init,
         )
-
-        self.embedding_resolution = embedding_resolution
-        self.embedding_features = embedding_features
-        # self.embedding = nn.Parameter(torch.zeros(1, embedding_features, embedding_resolution, embedding_resolution, embedding_resolution), 
-        #                               requires_grad=True)
-        # nn.init.normal_(self.embedding, 0, 1e-2)
-        encoding_config={
-                    "otype": "HashGrid" ,
-                    "n_levels": 16,
-                    "n_features_per_level": 8,
-                    "log2_hashmap_size": 19,
-                    "base_resolution": 16,
-                    "per_level_scale": 2.0,
-                    "interpolation": "Smoothstep",
-                }
-        self.encoding = tcnn.Encoding(in_features, encoding_config, dtype=torch.float32)
+        assert encoding is not None
+        self.encoding = encoding
 
 
         projection_layers =[]
-        for i in range(self.hidden_layers):
-            projection_layer = nn.Linear(embedding_features, hidden_dim, bias=True)
+        for _ in range(self.hidden_layers):
+            projection_layer = nn.Linear(self.encoding.out_features, hidden_dim, bias=True)
             nn.init.zeros_(projection_layer.bias)
             projection_layers.append(projection_layer)
         self.projection_layers = nn.ModuleList(projection_layers)
-        # self.projection_layer = nn.Linear(embedding_features, hidden_dim, bias=True)
-        # nn.init.zeros_(self.projection_layer.weight)
-        # nn.init.ones_(self.projection_layer.bias)
-
 
 
     def forward(self, points: torch.Tensor) -> torch.Tensor:
-        batch_size = points.shape[0]
-        points = points / 2.2 + 0.5 # normalize to [0, 1]
-        # Get the features at the points
         x = points
-        # points = points.view(1 , batch_size, 1, 1, 3).detach() # (B, 1, 1, 3)
-        # features = nn.functional.grid_sample(self.embedding, points, align_corners=False, padding_mode="border") 
-        features = self.encoding(points.detach())
-
-        # Reshape the features
-        features = features.view(batch_size, self.embedding_features)
-        # modulation = self.projection_layer(features)
-        # points = points.view(batch_size, 3)
+        # Get the features at the points
+        features = self.encoding(points)
 
         for i in range(self.hidden_layers):
             projection_layer = self.projection_layers[i]
