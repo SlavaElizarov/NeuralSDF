@@ -1,8 +1,6 @@
-from dataclasses import dataclass
 from typing import Optional, TypeVar
 import pytorch_lightning as pl
 import torch
-from torch import autograd
 from losses.losses import (
     EikonalLoss,
     GradientDirectionLoss,
@@ -17,12 +15,6 @@ from models.sdf import SDF
 T = TypeVar("T", bound=Optional[LossBase])
 
 
-class GradientParameters:
-    def __init__(self, force_numerical: bool = False, delta: float = 1e-3):
-        self.force_numerical = force_numerical
-        self.delta = delta
-
-
 class SdfExperiment(pl.LightningModule):
     def __init__(
         self,
@@ -33,7 +25,6 @@ class SdfExperiment(pl.LightningModule):
         offsurface_loss: Optional[OffSurfaceLoss] = None,
         laplacian_loss: Optional[LaplacianLoss] = None,
         offsurface_gt_loss: Optional[OffSurfaceGTLoss] = None,
-        grad_parameters: Optional[GradientParameters] = None,
     ):
         super().__init__()
         self.sdf_model = sdf_model
@@ -43,8 +34,6 @@ class SdfExperiment(pl.LightningModule):
         self.offsurface_loss = self._inject_logger(offsurface_loss)
         self.laplacian_loss = self._inject_logger(laplacian_loss)
         self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
-        self.grad_parameters = GradientParameters(
-        ) if grad_parameters is None else grad_parameters
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
@@ -59,17 +48,13 @@ class SdfExperiment(pl.LightningModule):
 
         points = torch.cat([surface_points, offsurface_points], dim=0)
 
-        distances = self.sdf_model(points)
+        if self.laplacian_loss is not None:
+            distances, gradient, laplacian = self.sdf_model.forward_with_grad_and_laplacian(points)
+        else:
+            distances, gradient = self.sdf_model.forward_with_grad(points)
+
         surface_distances = distances[:batch_size]
         offsurface_distances = distances[batch_size:]
-
-        # the gradient is needed for eikonal and direction losses
-        # we can compute it numerically or analytically
-        gradient = self.sdf_model.get_gradient(points,
-                                               self.grad_parameters.force_numerical,
-                                               self.grad_parameters.delta,
-                                               distances)
-
         surface_grad = gradient[:batch_size]
         offsurface_grad = gradient[batch_size:]
 
@@ -87,7 +72,6 @@ class SdfExperiment(pl.LightningModule):
 
         # Unfortunately, losses above are not always enough to make distance field smooth and consistent
         if self.laplacian_loss is not None:
-            laplacian = self.laplacian(gradient, points)
             loss += self.laplacian_loss(laplacian, gradient, distances)
 
         # SDF must be positive outside the surface
@@ -107,14 +91,3 @@ class SdfExperiment(pl.LightningModule):
             loss.set_logger(lambda name, loss: self.log(
                 name, loss, prog_bar=True))
         return loss
-
-    def divergence(self, y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        (dx,) = autograd.grad(y[:, 0].sum(), x, create_graph=True, retain_graph=True)
-        (dy,) = autograd.grad(y[:, 1].sum(), x, create_graph=True, retain_graph=True)
-        (dz,) = autograd.grad(y[:, 2].sum(), x, create_graph=True, retain_graph=True)
-
-        div = dx[:, 0] + dy[:, 1] + dz[:, 2]
-        return div
-
-    def laplacian(self, gradient: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        return self.divergence(gradient, x)

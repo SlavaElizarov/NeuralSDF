@@ -24,7 +24,7 @@ class RenderingCalback(pl.Callback):
         device="cuda",
     ):
 
-        camera = Camera(dist, elev, azim, resolution=256, device=device, half_precision=False)
+        camera = Camera(dist, elev, azim, resolution=256, device=device, half_precision=True)
         rend = SphereTracingRenderer(
             camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
         )
