@@ -36,12 +36,12 @@ model:
           per_level_scale: 2.0
           use_hash: true
           hash_smoothstep: true
-          mask_k_levels: 0
+          mask_k_levels: 8
       grad_parameters:
         class_path: models.sdf.GradientParameters
         init_args: 
           computation_type: NUMERICAL
-          delta: 0.001
+          delta: 0.01
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -75,10 +75,10 @@ model:
     #   weight: 3e-2
     #   beta: 0.005
 
-  # laplacian_loss:
-  #   class_path: losses.LaplacianLoss
-  #   init_args: 
-  #     weight: 1.0
+  laplacian_loss:
+    class_path: losses.LaplacianLoss
+    init_args: 
+      weight: 0.01
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
