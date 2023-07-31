@@ -117,9 +117,9 @@ class SDF(nn.Module, ABC):
         distances = distances.view(-1, 7)
         gradients = torch.stack(
             [
-                0.5 * (distances[:, 0] - distances[:, 1]) / delta,
-                0.5 * (distances[:, 2] - distances[:, 3]) / delta,
-                0.5 * (distances[:, 4] - distances[:, 5]) / delta,
+                0.5 * (distances[:, 0] - distances[:, 1]) / (delta + 1e-6),
+                0.5 * (distances[:, 2] - distances[:, 3]) / (delta + 1e-6),
+                0.5 * (distances[:, 4] - distances[:, 5]) / (delta + 1e-6),
             ],
             dim=-1,
         )
@@ -135,7 +135,7 @@ class SDF(nn.Module, ABC):
                 + distances[:, 4]
                 + distances[:, 5]
                 - 6 * distances[:, 6]
-            ) / delta ** 2
+            ) / (delta ** 2 + 1e-6)
 
             return values, gradients, laplacian
 

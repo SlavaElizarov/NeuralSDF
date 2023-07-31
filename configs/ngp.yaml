@@ -36,7 +36,7 @@ model:
           per_level_scale: 2.0
           use_hash: true
           hash_smoothstep: true
-          mask_k_levels: 8
+          mask_k_levels: 0
       grad_parameters:
         class_path: models.sdf.GradientParameters
         init_args: 
@@ -58,7 +58,7 @@ model:
     class_path: losses.GradientDirectionLoss
     init_args: 
       weight: 3.0
-      type: cos
+      type: monosdf
 
   offsurface_gt_loss:
     class_path: losses.OffSurfaceGTLoss
@@ -78,7 +78,7 @@ model:
   laplacian_loss:
     class_path: losses.LaplacianLoss
     init_args: 
-      weight: 0.01
+      weight: 0.1
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
@@ -120,6 +120,15 @@ trainer:
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
     # - callbacks.SirenFrequencyCalback
+    - class_path: callbacks.GradDeltaScheduler
+      init_args:
+        min_resolution: 64
+        max_resolution: 512
+        steps_per_level: 1024
+    - class_path: callbacks.CurvatureLossScheduler
+      init_args:
+        warmup_steps: 512
+        decay_steps: 2048
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.

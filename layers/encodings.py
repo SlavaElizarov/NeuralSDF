@@ -54,7 +54,7 @@ class GridEmbedding(nn.Module):
 
         if self.mask_k_levels > 0:
             keep_levels = self.num_levels - self.mask_k_levels
-            mask = torch.ones_like(features)
+            mask = torch.ones((1,) + features.shape[1:], device=features.device, dtype=features.dtype)
             mask[:, keep_levels * self.features_per_level:] = 0.0
             features = features * mask
 

@@ -24,9 +24,9 @@ class RenderingCalback(pl.Callback):
         device="cuda",
     ):
 
-        camera = Camera(dist, elev, azim, resolution=256, device=device, half_precision=True)
+        camera = Camera(dist, elev, azim, resolution=256, device=device, half_precision=False)
         rend = SphereTracingRenderer(
-            camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.001
+            camera, max_iteration=max_iteration, max_depth=max_depth, min_dist=0.0025
         )
         frame = rend.render(sdf_model).detach()
         return frame

@@ -47,15 +47,12 @@ model:
           per_level_scale: 2.0
           use_hash: true
           hash_smoothstep: true
-          mask_k_levels: 8
-          
-
-
-  grad_parameters:
-    class_path: training.sdf_experiment.GradientParameters
-    init_args: 
-      force_numerical: true
-      delta: 0.001
+          mask_k_levels: 12
+      grad_parameters:
+        class_path: models.sdf.GradientParameters
+        init_args: 
+          computation_type: NUMERICAL
+          delta: 0.01
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -72,18 +69,18 @@ model:
     class_path: losses.GradientDirectionLoss
     init_args: 
       weight: 3.0
-      type: cos
+      type: monosdf
 
   offsurface_gt_loss:
     class_path: losses.OffSurfaceGTLoss
     init_args: 
       weight: 30.0
 
-  # offsurface_loss:
-  #   class_path: losses.MarginLoss
-  #   init_args: 
-  #     weight: 30.0
-  #     margin: 0.005
+  offsurface_loss:
+    class_path: losses.MarginLoss
+    init_args: 
+      weight: 30.0
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 3e-2
@@ -92,7 +89,7 @@ model:
   laplacian_loss:
     class_path: losses.LaplacianLoss
     init_args: 
-      weight: 0.01
+      weight: 0.1
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
@@ -121,7 +118,7 @@ trainer:
     class_path: pytorch_lightning.loggers.TensorBoardLogger
     init_args:
       save_dir: logs
-      name: siren
+      name: siren-modulated
   enable_checkpointing: true
 
 
@@ -134,6 +131,19 @@ trainer:
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
     # - callbacks.SirenFrequencyCalback
+    - class_path: callbacks.GradDeltaScheduler
+      init_args:
+        min_resolution: 64
+        max_resolution: 512
+        steps_per_level: 1024
+        swith_to_analytical_after_max: true
+    - class_path: callbacks.CurvatureLossScheduler
+      init_args:
+        warmup_steps: 512
+        decay_steps: 2048
+    - class_path: callbacks.MaskLevelsCallback
+      init_args:
+        steps_per_level: 318
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.
@@ -248,7 +258,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 16-mixed
+  precision: 32
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)
