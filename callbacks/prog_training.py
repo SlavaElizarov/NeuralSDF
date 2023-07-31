@@ -37,7 +37,7 @@ class MaskLevelsCallback(pl.Callback):
         self.encodimg_field_name = encodimg_field_name
         self._encoding = None
 
-    def on_train_batch_start(
+    def on_train_batch_end(
         self, trainer: pl.Trainer, experiment: SdfExperiment, batch, batch_idx
     ) -> None:
         if self._encoding is None:

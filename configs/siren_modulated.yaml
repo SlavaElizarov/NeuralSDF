@@ -52,7 +52,7 @@ model:
         class_path: models.sdf.GradientParameters
         init_args: 
           computation_type: NUMERICAL
-          delta: 0.01
+          delta: 0.02
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -76,20 +76,20 @@ model:
     init_args: 
       weight: 30.0
 
-  offsurface_loss:
-    class_path: losses.MarginLoss
-    init_args: 
-      weight: 30.0
-      margin: 0.005
+  # offsurface_loss:
+  #   class_path: losses.MarginLoss
+  #   init_args: 
+  #     weight: 30.0
+  #     margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 3e-2
     #   beta: 0.005
 
-  laplacian_loss:
-    class_path: losses.LaplacianLoss
-    init_args: 
-      weight: 0.1
+  # laplacian_loss:
+  #   class_path: losses.LaplacianLoss
+  #   init_args: 
+  #     weight: 0.1
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
@@ -143,7 +143,7 @@ trainer:
         decay_steps: 2048
     - class_path: callbacks.MaskLevelsCallback
       init_args:
-        steps_per_level: 318
+        steps_per_level: 512
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.
