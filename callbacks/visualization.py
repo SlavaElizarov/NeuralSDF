@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 from models.sdf import SDF
 from renderer.camera import Camera
 from renderer.renderer import SphereTracingRenderer
-from training.sdf_experiment import SdfExperiment
+from training.sdf_experiment import Cloud2SdfExperiment
 
 
 class RenderingCalback(pl.Callback):
@@ -31,10 +31,10 @@ class RenderingCalback(pl.Callback):
         frame = rend.render(sdf_model).detach()
         return frame
     
-    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: SdfExperiment) -> None:
+    def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: Cloud2SdfExperiment) -> None:
         return self.on_train_epoch_end(trainer, pl_module)
 
-    def on_train_epoch_end(self, trainer: pl.Trainer, model: SdfExperiment):
+    def on_train_epoch_end(self, trainer: pl.Trainer, model: Cloud2SdfExperiment):
         sdf_model = model.sdf_model
         frame_front = self.render(sdf_model, dist=1.3, elev=0, azim=0, device=model.device, max_iteration=40)  # type: ignore
         frame_back = self.render(sdf_model, dist=1.3, elev=0, azim=180, device=model.device, max_iteration=40)  # type: ignore
@@ -56,7 +56,7 @@ class ActivationDistributionCalback(pl.Callback):
         self.log_every_n_batches = log_every_n_batches
         self.number_of_samples = number_of_samples
 
-    def on_fit_start(self, trainer: pl.Trainer, experiment: SdfExperiment):
+    def on_fit_start(self, trainer: pl.Trainer, experiment: Cloud2SdfExperiment):
         tensorboard: SummaryWriter = trainer.logger.experiment  # type: ignore
 
         def hook_wrapper(name: str, trainer: pl.Trainer):

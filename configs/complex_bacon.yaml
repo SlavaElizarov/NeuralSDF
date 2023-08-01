@@ -18,7 +18,7 @@ lr_scheduler:
   init_args:
     gamma: 0.97
 
-# <class 'training.sdf_experiment.SdfExperiment'>
+# <class 'training.sdf_experiment.Cloud2SdfExperiment'>
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:

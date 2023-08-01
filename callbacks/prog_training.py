@@ -1,5 +1,5 @@
 
-from training.sdf_experiment import SdfExperiment
+from training.sdf_experiment import Cloud2SdfExperiment
 from models.sdf import GradComputationType
 from layers.encodings import GridEmbedding
 import pytorch_lightning as pl
@@ -12,7 +12,7 @@ class CurvatureLossScheduler(pl.Callback):
         self._config_loss_weight = None
 
     def on_train_batch_start(
-        self, trainer: pl.Trainer, experiment: SdfExperiment, batch, batch_idx
+        self, trainer: pl.Trainer, experiment: Cloud2SdfExperiment, batch, batch_idx
     ) -> None:
         if experiment.laplacian_loss is None:
             return
@@ -38,7 +38,7 @@ class MaskLevelsCallback(pl.Callback):
         self._encoding = None
 
     def on_train_batch_end(
-        self, trainer: pl.Trainer, experiment: SdfExperiment, batch, batch_idx
+        self, trainer: pl.Trainer, experiment: Cloud2SdfExperiment, outputs, batch, batch_idx
     ) -> None:
         if self._encoding is None:
             assert hasattr(experiment.sdf_model, self.encodimg_field_name)
@@ -67,7 +67,7 @@ class GradDeltaScheduler(pl.Callback):
         self.delta_final = 1 / max_resolution
 
     def on_train_batch_start(
-        self, trainer: pl.Trainer, experiment: SdfExperiment, batch, batch_idx
+        self, trainer: pl.Trainer, experiment: Cloud2SdfExperiment, batch, batch_idx
     ) -> None:
         assert experiment.sdf_model.grad_parameters is not None
 

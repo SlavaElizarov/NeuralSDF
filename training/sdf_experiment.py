@@ -15,7 +15,7 @@ from models.sdf import SDF
 T = TypeVar("T", bound=Optional[LossBase])
 
 
-class SdfExperiment(pl.LightningModule):
+class Cloud2SdfExperiment(pl.LightningModule):
     def __init__(
         self,
         sdf_model: SDF,

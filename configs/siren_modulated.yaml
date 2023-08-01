@@ -7,16 +7,17 @@ seed_everything: 42
 #     lr: 0.00014
 #     # amsgrad: false
 optimizer:
-  class_path: torch.optim.Adam
+  class_path: torch.optim.AdamW
   init_args:
     lr: 0.0001
+    weight_decay: 0.01
     # amsgrad: true
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
   init_args:
     gamma: 0.98
 
-# <class 'training.sdf_experiment.SdfExperiment'>
+# <class 'training.sdf_experiment.Cloud2SdfExperiment'>
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
@@ -44,14 +45,14 @@ model:
           features_per_level: 8
           log2_hashmap_size: 19
           base_resolution: 16
-          per_level_scale: 2.0
+          growth_factor: 1.4142135623730951 # sqrt(2)
           use_hash: true
           hash_smoothstep: true
           mask_k_levels: 12
       grad_parameters:
         class_path: models.sdf.GradientParameters
         init_args: 
-          computation_type: NUMERICAL
+          computation_type: ANALYTICAL
           delta: 0.02
 
   level_set_loss: 
@@ -76,11 +77,11 @@ model:
     init_args: 
       weight: 30.0
 
-  # offsurface_loss:
-  #   class_path: losses.MarginLoss
-  #   init_args: 
-  #     weight: 30.0
-  #     margin: 0.005
+  offsurface_loss:
+    class_path: losses.MarginLoss
+    init_args: 
+      weight: 30.0
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
     #   weight: 3e-2
@@ -131,16 +132,16 @@ trainer:
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
     # - callbacks.SirenFrequencyCalback
-    - class_path: callbacks.GradDeltaScheduler
-      init_args:
-        min_resolution: 64
-        max_resolution: 512
-        steps_per_level: 1024
-        swith_to_analytical_after_max: true
-    - class_path: callbacks.CurvatureLossScheduler
-      init_args:
-        warmup_steps: 512
-        decay_steps: 2048
+    # - class_path: callbacks.GradDeltaScheduler
+    #   init_args:
+    #     min_resolution: 64
+    #     max_resolution: 512
+    #     steps_per_level: 1024
+    #     swith_to_analytical_after_max: true
+    # - class_path: callbacks.CurvatureLossScheduler
+    #   init_args:
+    #     warmup_steps: 512
+    #     decay_steps: 2048
     - class_path: callbacks.MaskLevelsCallback
       init_args:
         steps_per_level: 512

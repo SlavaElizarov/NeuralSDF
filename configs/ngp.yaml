@@ -16,7 +16,7 @@ lr_scheduler:
   init_args:
     gamma: 0.98
 
-# <class 'training.sdf_experiment.SdfExperiment'>
+# <class 'training.sdf_experiment.Cloud2SdfExperiment'>
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
@@ -33,7 +33,7 @@ model:
           features_per_level: 8
           log2_hashmap_size: 19
           base_resolution: 16
-          per_level_scale: 2.0
+          growth_factor: 2.0
           use_hash: true
           hash_smoothstep: true
           mask_k_levels: 0
