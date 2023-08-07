@@ -46,7 +46,7 @@ class MaskLevelsCallback(pl.Callback):
             assert isinstance(encoding, GridEmbedding)
             self._encoding = encoding
 
-        if self._encoding.mask_k_levels > 0 and \
+        if self._encoding.mask_k_levels > 0 and trainer.global_step > 0 and \
            trainer.global_step % self.steps_per_level == 0:
             self._encoding.mask_k_levels -= 1
             print(f"Unmasking level {self._encoding.mask_k_levels}")

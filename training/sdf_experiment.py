@@ -9,6 +9,7 @@ from losses.losses import (
     OffSurfaceGTLoss,
     OffSurfaceLoss,
     SurfaceLoss,
+    PullLoss,
 )
 from models.sdf import SDF
 
@@ -25,6 +26,7 @@ class Cloud2SdfExperiment(pl.LightningModule):
         offsurface_loss: Optional[OffSurfaceLoss] = None,
         laplacian_loss: Optional[LaplacianLoss] = None,
         offsurface_gt_loss: Optional[OffSurfaceGTLoss] = None,
+        pull_loss: Optional[PullLoss] = None,
     ):
         super().__init__()
         self.sdf_model = sdf_model
@@ -34,6 +36,7 @@ class Cloud2SdfExperiment(pl.LightningModule):
         self.offsurface_loss = self._inject_logger(offsurface_loss)
         self.laplacian_loss = self._inject_logger(laplacian_loss)
         self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
+        self.pull_loss = self._inject_logger(pull_loss)
 
         self.save_hyperparameters(ignore=["sdf_model"])
 
@@ -82,6 +85,9 @@ class Cloud2SdfExperiment(pl.LightningModule):
         if self.offsurface_gt_loss is not None:
             loss += self.offsurface_gt_loss(offsurface_distances,
                                             offsurface_distances_gt)
+            
+        if self.pull_loss is not None:
+            loss += self.pull_loss(offsurface_points, offsurface_distances_gt[:, None], offsurface_grad, self.sdf_model)
         
         self.log("loss", loss, prog_bar=True)
         return loss

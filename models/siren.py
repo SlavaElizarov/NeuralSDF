@@ -111,7 +111,71 @@ class ModulatedSiren(Siren):
             x = layer.forward(x, shift=projection_layer(features))
 
         return self.layers[self.hidden_layers](x)
-   
+
+
+class AnycostSiren(Siren):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_dim: int,
+        out_features: int,
+        encoding: GridEmbedding,
+        outermost_linear: bool = False,
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
+        grad_parameters: Optional[GradientParameters] = None,
+    ):
+        assert encoding is not None
+        super().__init__(
+            in_features,
+            hidden_dim,
+            encoding.num_levels,
+            out_features,
+            outermost_linear,
+            first_layer_init,
+            hidden_layer_init,
+            grad_parameters,
+        )
+        self.encoding = encoding
+
+
+        projection_layers =[]
+        output_layers = []
+        for _ in range(self.hidden_layers):
+            projection_layer = nn.Linear(self.encoding.features_per_level, hidden_dim, bias=True)
+            nn.init.zeros_(projection_layer.bias)
+            projection_layers.append(projection_layer)
+
+            output_layer = SirenLayer(
+            hidden_dim, out_features, add_bias=True, disable_activation=outermost_linear
+            )
+            nn.init.zeros_(output_layer.bias)
+            output_layers.append(output_layer)
+
+        self.projection_layers = nn.ModuleList(projection_layers)
+        self.output_layers = nn.ModuleList(output_layers)
+
+
+    def forward(self, points: torch.Tensor) -> torch.Tensor:
+        x = points
+        # Get the features at the points
+        features = self.encoding(points)
+        features_per_level = self.encoding.features_per_level
+        
+        y = None
+        for i in range(self.hidden_layers):
+            projection_layer = self.projection_layers[i]
+            layer = self.layers[i]
+            output_layer = self.output_layers[i]
+            x = layer.forward(x, shift=projection_layer(features[:, i * features_per_level:(i + 1) * features_per_level]))
+            y = output_layer(x) if y is None else y + output_layer(x)
+
+        return y
+
 
 class ComplexSiren(Siren):
     def __init__(

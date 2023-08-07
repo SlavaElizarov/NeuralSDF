@@ -3,6 +3,8 @@ from typing import Callable, Optional
 import torch
 from torch.nn import functional as F
 
+from models.sdf import SDF
+
 
 class LossBase(ABC):
     def __init__(self, weight: float = 1.0, name: Optional[str] = None):
@@ -214,3 +216,32 @@ class DivergenceLoss(LaplacianLoss):
         y: torch.Tensor,
     ) -> torch.Tensor:
         return torch.abs(laplacian).mean()
+    
+class PullLoss(LossBase):
+    def __init__(self, weight: float = 1.0, sigma: float = 10.):
+        """
+        Based on the following papers:
+        https://arxiv.org/abs/2011.13495
+        https://arxiv.org/abs/2305.11601
+
+        Args:
+            weight (float, optional): _description_. Defaults to 1.0.
+        """
+        super().__init__(weight=weight, name=f"pull")
+        self.sigma = sigma
+    
+    def _loss(self, points: torch.Tensor, distances: torch.Tensor, gradient: torch.Tensor, sdf_model: SDF) -> torch.Tensor:
+        gradient_norm = F.normalize(gradient, dim=-1)
+        points_moved = points - gradient_norm * distances
+
+        _, gradient_movied = sdf_model.forward_with_grad(points_moved)
+        # gradient_movied_norm = F.normalize(gradient_movied, dim=-1)
+        consis_constraint = 1 - F.cosine_similarity(gradient_movied, gradient, dim=-1)
+        weight_moved = torch.exp(-self.sigma * torch.abs(distances)).reshape(-1,consis_constraint.shape[-1])
+
+        return (consis_constraint * weight_moved).mean() * self.weight
+
+
+
+
+
