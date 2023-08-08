@@ -7,10 +7,11 @@ seed_everything: 42
 #     lr: 0.00014
 #     # amsgrad: false
 optimizer:
-  class_path: torch.optim.Adam
+  class_path: torch.optim.AdamW
   init_args:
-    lr: 0.00014
-    amsgrad: true
+    lr: 0.0001
+    weight_decay: 0.01
+    # amsgrad: true
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
   init_args:
@@ -20,22 +21,39 @@ lr_scheduler:
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.siren.ModulatedSiren
     init_args: 
       in_features: 3
-      hidden_dim: 256
-      hidden_layers: 6
+      hidden_dim: 128
+      hidden_layers: 4
       out_features: 1
-      outermost_linear: True
+      outermost_linear: true
       first_layer_init:
-        class_path: layers.initializers.SirenLogNormalInitializer
+        class_path: layers.initializers.SirenUniformInitializer
         init_args:
-          omega: 30.0
-          std: 2.2
+          omega: 90.0
+          is_first: true
       hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
-          omega: 60.0
+          omega: 90.0
+      encoding:
+        class_path: layers.encodings.GridEmbedding
+        init_args:
+          in_features: 3
+          num_levels: 14
+          features_per_level: 8
+          log2_hashmap_size: 19
+          base_resolution: 16
+          growth_factor: 1.4142135623730951 # sqrt(2)
+          use_hash: true
+          hash_smoothstep: true
+          mask_k_levels: 9
+      grad_parameters:
+        class_path: models.sdf.GradientParameters
+        init_args: 
+          computation_type: ANALYTICAL
+          delta: 0.02
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -59,17 +77,20 @@ model:
     init_args: 
       weight: 30.0
 
-  # offsurface_loss:
-  #   class_path: losses.MarginLoss
-  #   init_args: 
-  #     weight: 30.0
-  #     margin: 0.001
+  offsurface_loss:
+    class_path: losses.MarginLoss
+    init_args: 
+      weight: 30.0
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
-    #   weight: 0.3
+    #   weight: 3e-2
     #   beta: 0.005
 
-  laplacian_loss:
+  # laplacian_loss:
+  #   class_path: losses.LaplacianLoss
+  #   init_args: 
+  #     weight: 0.1
   
 # <class 'training.mesh_data_module.SdfDataModule'>
 data:
@@ -98,7 +119,7 @@ trainer:
     class_path: pytorch_lightning.loggers.TensorBoardLogger
     init_args:
       save_dir: logs
-      name: siren_lognormal
+      name: siren-modulated
   enable_checkpointing: true
 
 
@@ -111,6 +132,19 @@ trainer:
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
     # - callbacks.SirenFrequencyCalback
+    # - class_path: callbacks.GradDeltaScheduler
+    #   init_args:
+    #     min_resolution: 64
+    #     max_resolution: 512
+    #     steps_per_level: 1024
+    #     swith_to_analytical_after_max: true
+    # - class_path: callbacks.CurvatureLossScheduler
+    #   init_args:
+    #     warmup_steps: 512
+    #     decay_steps: 2048
+    - class_path: callbacks.MaskLevelsCallback
+      init_args:
+        steps_per_level: 512
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.
@@ -225,7 +259,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 16
+  precision: bf16-mixed
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)

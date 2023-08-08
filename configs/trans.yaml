@@ -9,7 +9,7 @@ seed_everything: 42
 optimizer:
   class_path: torch.optim.Adam
   init_args:
-    lr: 0.00014
+    lr: 0.00012
     amsgrad: true
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
@@ -20,7 +20,7 @@ lr_scheduler:
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.siren.Siren
+    class_path: models.transformer.LatentTransformer
     init_args: 
       in_features: 3
       hidden_dim: 256
@@ -28,14 +28,14 @@ model:
       out_features: 1
       outermost_linear: True
       first_layer_init:
-        class_path: layers.initializers.SirenLogNormalInitializer
-        init_args:
-          omega: 30.0
-          std: 2.2
-      hidden_layer_init:
         class_path: layers.initializers.SirenUniformInitializer
         init_args:
           omega: 60.0
+          is_first: True
+      hidden_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 30.0
 
   level_set_loss: 
     class_path: losses.SurfaceLoss
@@ -46,27 +46,21 @@ model:
     class_path: losses.EikonalLoss
     init_args: 
       weight: 2.0
-      type: l2
 
   grad_direction_loss:
     class_path: losses.GradientDirectionLoss
     init_args: 
       weight: 3.0
-      type: monosdf
+      type: cos
 
-  offsurface_gt_loss:
-    class_path: losses.OffSurfaceGTLoss
+  offsurface_loss:
+    class_path: losses.MarginLoss
     init_args: 
       weight: 30.0
-
-  # offsurface_loss:
-  #   class_path: losses.MarginLoss
-  #   init_args: 
-  #     weight: 30.0
-  #     margin: 0.001
+      margin: 0.005
     # class_path: losses.CoareaLoss
     # init_args: 
-    #   weight: 0.3
+    #   weight: 3e-2
     #   beta: 0.005
 
   laplacian_loss:
@@ -81,7 +75,7 @@ data:
       model_path: data/frazer-nash-super-sport-1929.obj
       number_of_samples: 10240000
       add_vertices: true
-  batch_size: 40000
+  batch_size: 20000
 
 
 
@@ -98,7 +92,7 @@ trainer:
     class_path: pytorch_lightning.loggers.TensorBoardLogger
     init_args:
       save_dir: logs
-      name: siren_lognormal
+      name: siren
   enable_checkpointing: true
 
 

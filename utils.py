@@ -27,12 +27,11 @@ class LatinHypercubeSampler:
         self.region = region
         self.dim = region.shape[0]
 
-    def __call__(self, n_samples: int, device: str = "cuda") -> torch.Tensor:
-        return self.sample(n_samples, device)
+    def __call__(self, n_samples: int) -> np.ndarray:
+        return self.sample(n_samples)
 
-    def sample(self, n_samples: int, device: str = "cuda") -> torch.Tensor:
+    def sample(self, n_samples: int) -> np.ndarray:
         assert n_samples > 0, "Number of samples must be greater than 0."
-        assert device in ["cpu", "cuda"], "Device must be either 'cpu' or 'cuda'."
 
         points_per_dim = np.floor(np.power(n_samples, 1 / self.dim)).astype(int)
         n_samples_int = int(np.power(points_per_dim, self.dim))
@@ -41,22 +40,21 @@ class LatinHypercubeSampler:
             n_samples = n_samples_int
         # calculate cell size
         cell_size = (self.region[:, 1] - self.region[:, 0]) / points_per_dim
-
+        
         # generate random samples wrt the center of each cell
-        random_sampler = torch.distributions.uniform.Uniform(
-            torch.tensor(cell_size * -0.5, dtype=torch.float32),
-            torch.tensor(cell_size * 0.5, dtype=torch.float32),
-        )
-
-        points = random_sampler.sample((n_samples,))  # type: ignore
+        points = np.random.uniform(
+            cell_size * -0.5,
+            cell_size * 0.5,
+            size= (n_samples, len(cell_size))
+        ).astype(np.float32)
 
         sides = []
         for side in self.region:
             sides.append(
-                torch.linspace(side[0], side[1], points_per_dim, dtype=torch.float32)
+                np.linspace(side[0], side[1], points_per_dim, dtype=np.float32)
             )
-        grid = torch.stack(torch.meshgrid(*sides, indexing="ij"), dim=-1)
+        grid = np.stack(np.meshgrid(*sides, indexing="ij"), axis=-1)
         grid = grid.reshape(n_samples, self.dim)
         grid += cell_size * 0.5  # shift grid to the center of the cell
         grid += points
-        return grid.float().to(device)
+        return grid

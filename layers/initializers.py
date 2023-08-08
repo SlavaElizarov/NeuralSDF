@@ -2,6 +2,7 @@ from abc import ABC
 import torch
 from torch import nn
 import numpy as np
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 class Initializer(ABC):
@@ -46,6 +47,33 @@ class SirenUniformInitializer(SirenInitializer):
             -np.sqrt(6 / input_dim) / self.omega,
             np.sqrt(6 / input_dim) / self.omega,
         )
+
+
+class SirenCorrelatedInitializer(SirenInitializer):
+    def __init__(self, omega: float = 30.0, is_first: bool = False):
+        """
+        Fill the weights with values from a normal distribution
+        Modification of the method described in paper: https://arxiv.org/abs/2006.09661
+
+        Args:
+            omega (float): omega is a frequency factor which simply multiplies
+                                        the features before the nonlinearity.
+                                        Different signals may require different omega_0 in the first layer.
+            is_first (bool): is this the first layer in the network
+        """
+        super().__init__(omega)
+        self.is_first = is_first
+
+    def initialize(self, tensor: torch.Tensor) -> torch.Tensor:
+        assert tensor.ndim == 2
+        with torch.no_grad():
+            output_dim, input_dim = tensor.shape
+            dist = MultivariateNormal(torch.zeros(input_dim), covariance_matrix=(torch.ones(3,3) * 0.5 + torch.eye(3) * 0.5)  / input_dim / 9)
+            weight = dist.sample((output_dim,))
+            if self.is_first:
+                tensor[:,:] = weight[:,:]
+                return tensor
+            return nn.init.normal_(tensor, 0, np.sqrt(2 / input_dim) / self.omega)
 
 
 class SirenNormalInitializer(SirenInitializer):
