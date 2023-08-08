@@ -3,7 +3,6 @@ import os
 from typing import Tuple
 import numpy as np
 
-import torch
 from torch.utils.data import Dataset
 import open3d as o3d
 from open3d.geometry import TriangleMesh
@@ -25,8 +24,8 @@ class MeshSampler(ABC):
 class UniformMeshSampler(MeshSampler):
     def sample(self, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         pointcloud = self.mesh.sample_points_uniformly(num_samples) # type: ignore
-        points = np.asarray(pointcloud.points, dtype=np.float32)
-        normals = np.asarray(pointcloud.normals, dtype=np.float32)
+        points = np.asarray(pointcloud.points, dtype=np.float16)
+        normals = np.asarray(pointcloud.normals, dtype=np.float16)
         return points, normals
 
 
@@ -99,14 +98,18 @@ class MeshDataset(Dataset):
             points = np.concatenate([points, self.mesh.vertices], axis=0, dtype=points.dtype)  # type: ignore
             normals = np.concatenate([normals, self.mesh.vertex_normals], axis=0, dtype=normals.dtype)  # type: ignore
 
-        self._surface_points = points # type: ignore
-        self._normals = normals # type: ignore
+        # swap y and z axis
+        # Open3D uses xzy order but we need good old xyz
+        self._surface_points = points[:, [0,2,1]]
+        self._normals = normals[:, [0,2,1]]
         
         self._off_surface_points = self.space_sampler(
             self._surface_points.shape[0])
 
         if self.precompute_sdf:
             self.sdf_values = self._compute_signed_distance(self._off_surface_points)
+
+        self._off_surface_points = self._off_surface_points[:, [0,2,1]]
 
     def _normalize_to_unit_sphere(self, mesh: TriangleMesh) -> TriangleMesh:
         v_max = np.max(mesh.vertices, axis=0)

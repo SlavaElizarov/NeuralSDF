@@ -7,9 +7,10 @@ seed_everything: 42
 #     lr: 0.00014
 #     # amsgrad: false
 optimizer:
-  class_path: torch.optim.Adam
+  class_path: torch.optim.AdamW
   init_args:
     lr: 0.0001
+    weight_decay: 0.01
     # amsgrad: true
 lr_scheduler:
   class_path: torch.optim.lr_scheduler.ExponentialLR
@@ -20,27 +21,37 @@ lr_scheduler:
 model:
   #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
   sdf_model:
-    class_path: models.ngp.NgpSdf
+    class_path: models.siren.AnycostSiren
     init_args: 
-      hidden_dim: 128
-      hidden_layers: 4
+      in_features: 3
+      hidden_dim: 64
       out_features: 1
+      outermost_linear: true
+      first_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 30.0
+          is_first: true
+      hidden_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 30.0
       encoding:
         class_path: layers.encodings.GridEmbedding
         init_args:
           in_features: 3
-          num_levels: 16
+          num_levels: 14
           features_per_level: 8
           log2_hashmap_size: 19
-          base_resolution: 14
-          growth_factor: 2.0
+          base_resolution: 16
+          growth_factor: 1.4142135623730951 # sqrt(2)
           use_hash: true
           hash_smoothstep: true
           mask_k_levels: 9
       grad_parameters:
         class_path: models.sdf.GradientParameters
         init_args: 
-          computation_type: NUMERICAL
+          computation_type: ANALYTICAL
           delta: 0.02
 
   level_set_loss: 
@@ -87,7 +98,7 @@ data:
   dataset:
     class_path: training.dataset.MeshDataset
     init_args: 
-      model_path: data/frazer-nash-super-sport-1929.obj
+      model_path: /home/duke/.objaverse/hf-objaverse-v1/glbs/000-067/8d870cf7fd1447759c4322b75c7fc201.glb
       number_of_samples: 10240000
       add_vertices: true
   batch_size: 40000
@@ -107,7 +118,7 @@ trainer:
     class_path: pytorch_lightning.loggers.TensorBoardLogger
     init_args:
       save_dir: logs
-      name: ngp
+      name: siren-modulated
   enable_checkpointing: true
 
 
@@ -120,18 +131,19 @@ trainer:
     # - pytorch_lightning.callbacks.StochasticWeightAveraging
     - pytorch_lightning.callbacks.LearningRateMonitor
     # - callbacks.SirenFrequencyCalback
-    - class_path: callbacks.GradDeltaScheduler
-      init_args:
-        min_resolution: 90
-        max_resolution: 2048
-        steps_per_level: 1024
-    - class_path: callbacks.CurvatureLossScheduler
-      init_args:
-        warmup_steps: 512
-        decay_steps: 2048
+    # - class_path: callbacks.GradDeltaScheduler
+    #   init_args:
+    #     min_resolution: 64
+    #     max_resolution: 512
+    #     steps_per_level: 1024
+    #     swith_to_analytical_after_max: true
+    # - class_path: callbacks.CurvatureLossScheduler
+    #   init_args:
+    #     warmup_steps: 512
+    #     decay_steps: 2048
     - class_path: callbacks.MaskLevelsCallback
       init_args:
-        steps_per_level: 1024
+        steps_per_level: 512
 
   # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
   # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.

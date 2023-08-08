@@ -38,8 +38,6 @@ class Cloud2SdfExperiment(pl.LightningModule):
         self.offsurface_gt_loss = self._inject_logger(offsurface_gt_loss)
         self.pull_loss = self._inject_logger(pull_loss)
 
-        self.save_hyperparameters(ignore=["sdf_model"])
-
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         surface_points, surface_normals, offsurface_points, offsurface_distances_gt = batch
         batch_size = surface_points.shape[0]

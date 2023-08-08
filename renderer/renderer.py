@@ -36,7 +36,8 @@ class SphereTracingRenderer:
             for _ in range(self.max_iteration):
                 d = torch.zeros_like(t)
                 points = origin + t[:, None] * directions  # move along ray on t units
-                d[condition] = sdf(points[condition])[:, 0]
+                d_cond = sdf(points[condition])[:, 0]
+                d[condition] = d_cond.to(d.dtype)
 
                 t = t + d
 
@@ -59,7 +60,7 @@ class SphereTracingRenderer:
             
             normals = gradient / torch.linalg.norm(gradient, dim=-1, keepdim=True)
             # TODO: fix camera
-            color = torch.einsum('ik,ik->i', normals, -directions[is_hit].view(-1, 3))
+            color = torch.einsum('ik,ik->i', normals, -directions[is_hit].view(-1, 3)).to(frame.dtype)
             
             frame[is_hit] = torch.stack([color]*3, dim=-1)
             frame = frame.reshape(self.camera.height, self.camera.width, 3)

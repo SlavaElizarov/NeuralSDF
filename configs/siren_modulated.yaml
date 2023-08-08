@@ -41,14 +41,14 @@ model:
         class_path: layers.encodings.GridEmbedding
         init_args:
           in_features: 3
-          num_levels: 16
+          num_levels: 14
           features_per_level: 8
           log2_hashmap_size: 19
           base_resolution: 16
           growth_factor: 1.4142135623730951 # sqrt(2)
           use_hash: true
           hash_smoothstep: true
-          mask_k_levels: 12
+          mask_k_levels: 9
       grad_parameters:
         class_path: models.sdf.GradientParameters
         init_args: 
@@ -259,7 +259,7 @@ trainer:
   # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
   # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
   # Default: ``32``. (type: Union[int, str], default: 32)
-  precision: 32
+  precision: bf16-mixed
 
   # Whether to enable model summarization by default.
   # Default: ``True``. (type: bool, default: True)

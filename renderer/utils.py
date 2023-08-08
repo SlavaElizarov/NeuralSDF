@@ -151,7 +151,7 @@ def look_at_rotation(
     z_axis = F.normalize(at_point - camera_position, eps=1e-5)
     x_axis = F.normalize(torch.cross(up_axis, z_axis, dim=1), eps=1e-5)
     y_axis = F.normalize(torch.cross(z_axis, x_axis, dim=1), eps=1e-5)
-    is_close = torch.isclose(x_axis, torch.tensor(0.0), atol=5e-3).all(
+    is_close = torch.isclose(x_axis, torch.tensor(0.0, device=camera_position.device, dtype=camera_position.dtype), atol=5e-3).all(
         dim=1, keepdim=True
     )
     if is_close.any():
