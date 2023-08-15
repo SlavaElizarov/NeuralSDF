@@ -1,3 +1,5 @@
+from typing import List
+import numpy as np
 import torch
 from torch import nn
 from layers import BaconFourierLayer
@@ -6,6 +8,11 @@ from layers.siren import ComplexExpLayer
 
 from models.sdf import SDF
 
+def mfn_weights_init(m):
+    with torch.no_grad():
+        if hasattr(m, 'weight'):
+            num_input = m.weight.size(-1)
+            m.weight.uniform_(-np.sqrt(6/num_input), np.sqrt(6/num_input))
 
 class Bacon(SDF):
     def __init__(
@@ -29,6 +36,8 @@ class Bacon(SDF):
 
         fourier_layers = []
         linear_layers = []
+        projection_layers = []
+
         for i in range(hidden_layers):
             fourier_layers.append(
                 BaconFourierLayer(
@@ -41,19 +50,27 @@ class Bacon(SDF):
             )
             if i != 0:
                 linear_layers.append(nn.Linear(hidden_dim, hidden_dim))
+                projection_layers.append(nn.Linear(hidden_dim, out_features))
 
         self.fourier_layers = nn.ModuleList(fourier_layers)
         self.linear_layers = nn.ModuleList(linear_layers)
-        self.final_layer = nn.Linear(hidden_dim, out_features)
+        self.projection_layers = nn.ModuleList(projection_layers)
+
+        # self.linear_layers.apply(mfn_weights_init)
+        # self.projection_layers.apply(mfn_weights_init)
+        # self.final_layer = nn.Linear(hidden_dim, out_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        values: List[torch.Tensor] = []
         z = self.fourier_layers[0](x)
         for i in range(1, self.hidden_layers):
             l = self.linear_layers[i - 1](z)
             g = self.fourier_layers[i](x)
             z = l * g
-
-        return self.final_layer(z)
+            val = self.projection_layers[i - 1](z)
+            values.append(val)
+        # index = np.random.randint(1, len(values))
+        return values[-1]
 
 
 class ComplexBacon(SDF):

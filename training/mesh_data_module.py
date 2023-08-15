@@ -23,7 +23,7 @@ class SdfDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             pin_memory=True,
-            prefetch_factor=2,
-            num_workers=6,
+            prefetch_factor=4,
+            num_workers=16,
             persistent_workers=False,
         )

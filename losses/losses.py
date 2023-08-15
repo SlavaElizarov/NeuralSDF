@@ -3,6 +3,8 @@ from typing import Callable, Optional
 import torch
 from torch.nn import functional as F
 
+from models.sdf import SDF
+
 
 class LossBase(ABC):
     def __init__(self, weight: float = 1.0, name: Optional[str] = None):
@@ -53,16 +55,25 @@ class OffSurfaceLoss(LossBase, ABC):
     ) -> torch.Tensor:
         return super().__call__(distances, gradients)
 
+class OffSurfaceGTLoss(LossBase):
+    def __init__(self, weight: float = 1.0):
+        super().__init__(weight=weight, name=f"offsurface_gt")
+
+    def _loss(self, distances: torch.Tensor, distances_gt: torch.Tensor) -> torch.Tensor:
+        return  torch.nn.functional.l1_loss(distances, distances_gt[:, None])
+
+    def __call__(self, distances: torch.Tensor, distances_gt: torch.Tensor) -> torch.Tensor:
+        return super().__call__(distances, distances_gt)
 
 class LaplacianLoss(LossBase, ABC):
-    def _loss(
-        self, y: torch.Tensor, laplacian: torch.Tensor, gradients: torch.Tensor
-    ) -> torch.Tensor:
-        return torch.abs(gradients).mean()
+    def __init__(self, weight: float = 1.0):
+        super().__init__(weight=weight, name=f"laplacian_loss")
+
+    def _loss(self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return torch.abs(laplacian).mean()
 
     def __call__(
-        self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor
-    ) -> torch.Tensor:
+        self, laplacian: torch.Tensor, gradients: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return super().__call__(laplacian, gradients, y)
 
 
@@ -74,14 +85,19 @@ class GradientDirectionLoss(LossBase):
             self._loss = self._loss_cos
         elif type == "l1":
             self._loss = self._loss_l1
+        elif type == "monosdf":
+            self._loss = self._loss_monosdf
         else:
             raise NotImplementedError(f"Loss {type} is not implemented")
 
     def _loss(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("This method should be implemented in __init__")
+    
+    def _loss_monosdf(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
+        return self._loss_cos(gradient, normals) + self._loss_l1(gradient, normals)
 
     def _loss_cos(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
-        return (1 - torch.abs(F.cosine_similarity(gradient, normals, dim=-1))).mean()
+        return (1 - F.cosine_similarity(gradient, normals, dim=-1)).mean()
 
     def _loss_l1(self, gradient: torch.Tensor, normals: torch.Tensor) -> torch.Tensor:
         return F.l1_loss(gradient, normals, reduction="mean")
@@ -91,8 +107,9 @@ class GradientDirectionLoss(LossBase):
 
 
 class EikonalLoss(LossBase):
-    def __init__(self, weight: float = 1.0):
+    def __init__(self, weight: float = 1.0, type: str = "l1"):
         super().__init__(weight=weight, name=f"eikonal")
+        self.type = type
 
     def _loss(self, gradient: torch.Tensor) -> torch.Tensor:
         """
@@ -108,8 +125,12 @@ class EikonalLoss(LossBase):
             torch.Tensor: l1 loss between the gradient norm and 1
         """
         grad_norm = torch.linalg.norm(gradient, ord=2, dim=-1)
-        # return torch.square(grad_norm - 1).mean()
-        return torch.abs(grad_norm - 1).mean()
+        if self.type == "l2":
+            return torch.square(grad_norm - 1).mean()
+        elif self.type == "l1":
+            return torch.abs(grad_norm - 1).mean()
+        else:
+            raise NotImplementedError(f"Loss {self.type} is not implemented")
 
 
 class ViscosityLoss(LaplacianLoss):
@@ -140,7 +161,7 @@ class MarginLoss(OffSurfaceLoss):
         self.margin = margin
 
     def _loss(self, distances: torch.Tensor, gradients: torch.Tensor) -> torch.Tensor:
-        return (F.relu(self.margin - F.relu(distances)) * 100).mean()
+        return (F.relu(self.margin - torch.abs(distances)) * 100).mean()
 
 
 class CoareaLoss(OffSurfaceLoss):
@@ -195,3 +216,32 @@ class DivergenceLoss(LaplacianLoss):
         y: torch.Tensor,
     ) -> torch.Tensor:
         return torch.abs(laplacian).mean()
+    
+class PullLoss(LossBase):
+    def __init__(self, weight: float = 1.0, sigma: float = 10.):
+        """
+        Based on the following papers:
+        https://arxiv.org/abs/2011.13495
+        https://arxiv.org/abs/2305.11601
+
+        Args:
+            weight (float, optional): _description_. Defaults to 1.0.
+        """
+        super().__init__(weight=weight, name=f"pull")
+        self.sigma = sigma
+    
+    def _loss(self, points: torch.Tensor, distances: torch.Tensor, gradient: torch.Tensor, sdf_model: SDF) -> torch.Tensor:
+        gradient_norm = F.normalize(gradient, dim=-1)
+        points_moved = points - gradient_norm * distances
+
+        _, gradient_movied = sdf_model.forward_with_grad(points_moved)
+        # gradient_movied_norm = F.normalize(gradient_movied, dim=-1)
+        consis_constraint = 1 - F.cosine_similarity(gradient_movied, gradient, dim=-1)
+        weight_moved = torch.exp(-self.sigma * torch.abs(distances)).reshape(-1,consis_constraint.shape[-1])
+
+        return (consis_constraint * weight_moved).mean() * self.weight
+
+
+
+
+

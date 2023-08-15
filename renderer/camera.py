@@ -62,19 +62,55 @@ class Cameras(nn.Module):
         intrinsic[:, 1, 2] = self.height / 2
         return intrinsic  # Bx4x4
 
-    def set_position(self, dist: float, elev: float, azim: float) -> None:
-        self.dist = dist
-        self.elev = elev
-        self.azim = azim
-        R, T = look_at_view_transform(
-            self.dist, self.elev, self.azim, device=self.device
-        )
-        self.rotation = R
-        self.origin = T
+    @property
+    def batch_size(self) -> int:
+        """Return the batch size of the storage.
 
-    def project(self, points: torch.Tensor) -> torch.Tensor:
+        Returns:
+            scalar with the batch size.
         """
-        Project points to the camera's image plane.
+        return self.rotation.shape[0]
+
+    
+    def forward(self, points: Tensor, camera_indices: Tensor) -> Tensor:
+        """Transforms points from world space to screen space.
+
+        Args:
+            points (Tensor): tensor of shape (N, 3) containing points in world space.
+            camera_indices (Tensor): tensor of shape (N) containing the camera indices for each point.
+
+        Returns:
+            Tensor: tensor of shape (N, 2) containing points in screen space.
+        """        
+        assert points.dim() == 3
+        assert points.shape[-1] == 3
+        assert camera_indices.dim() == 1
+        assert camera_indices.shape[0] == points.shape[0]
+
+        projection = self.projection[camera_indices].unsqueeze(1) # Bx1x4x4
+
+        # to homogeneous
+        points_h = convert_points_to_homogeneous(points)  # BxNx4
+        # transform coordinates
+        points_0_h = torch.matmul(points_h, projection.permute(0, 2, 1)) # BxNx4
+        # points_0_h = torch.bmm(points_h, projection.permute(0, 2, 1))
+        points_0_h = torch.squeeze(points_0_h, dim=-1)
+        # to euclidean
+        return convert_points_from_homogeneous(points_0_h)  # BxNx3
+    
+    
+    def emit_rays(self,
+                  camera_indices: Optional[Tensor] = None,
+                  rays_per_pixel: int = 1,
+                  uv: Optional[Tensor] = None) -> Tensor:
+        """Emit rays from camera origin to screen space for ray/sphere tracing and NERFs.
+
+        Args:
+            camera_indices (Tensor): tensor of shape (N) containing the camera indices for each point. (B)
+            coords (Optional[Tensor], optional): UV coordinates of ray origins. Defaults to None. (B, N, 2)
+
+        Returns:
+            Tensor: tensor of shape (N, 3) containing ray directions.
         """
         return self.rotation.shape[0]
 

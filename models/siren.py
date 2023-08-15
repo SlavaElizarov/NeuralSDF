@@ -1,12 +1,15 @@
+from typing import Optional
+
 import torch
 from torch import nn
 
-from layers import SirenLayer, ComplexExpLayer
+from layers import ComplexExpLayer, SirenLayer
+from layers.encodings import GridEmbedding
 from layers.initializers import SirenInitializer, SirenUniformInitializer
-from models.sdf import SDF
+from models.sdf import SDF, GradientParameters
 
 
-class Siren(nn.Sequential, SDF):
+class Siren(SDF):
     def __init__(
         self,
         in_features: int,
@@ -20,6 +23,7 @@ class Siren(nn.Sequential, SDF):
         hidden_layer_init: SirenInitializer = SirenUniformInitializer(
             omega=30.0, is_first=False
         ),
+        grad_parameters: Optional[GradientParameters] = None,
     ):
         """
             Siren model described in paper: https://arxiv.org/abs/2006.09661
@@ -32,7 +36,10 @@ class Siren(nn.Sequential, SDF):
             outermost_linear (bool, optional): Is final layer linear?. Defaults to False.
             init_scheme (SirenInitializer, optional): See 3.2 of the paper. Defaults to SirenUniformInitializer.
         """
-        super().__init__()
+        super().__init__(grad_parameters)
+        self.hidden_dim = hidden_dim
+        self.hidden_layers = hidden_layers
+
         layers = []
 
         for i in range(hidden_layers):
@@ -50,7 +57,124 @@ class Siren(nn.Sequential, SDF):
         nn.init.zeros_(final_layer.bias)
         layers.append(final_layer)
 
-        super().__init__(*layers)
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layers(x)
+
+class ModulatedSiren(Siren):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_dim: int,
+        hidden_layers: int,
+        out_features: int,
+        encoding: GridEmbedding,
+        outermost_linear: bool = False,
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
+        grad_parameters: Optional[GradientParameters] = None,
+    ):
+        super().__init__(
+            in_features,
+            hidden_dim,
+            hidden_layers,
+            out_features,
+            outermost_linear,
+            first_layer_init,
+            hidden_layer_init,
+            grad_parameters,
+        )
+        assert encoding is not None
+        self.encoding = encoding
+
+        projection_layers =[]
+        for _ in range(self.hidden_layers):
+            projection_layer = nn.Linear(self.encoding.out_features, hidden_dim, bias=True)
+            nn.init.zeros_(projection_layer.bias)
+            projection_layers.append(projection_layer)
+        self.projection_layers = nn.ModuleList(projection_layers)
+
+
+    def forward(self, points: torch.Tensor) -> torch.Tensor:
+        x = points
+        # Get the features at the points
+        features = self.encoding(points)
+
+        for i in range(self.hidden_layers):
+            projection_layer = self.projection_layers[i]
+            layer = self.layers[i]
+            x = layer.forward(x, shift=projection_layer(features))
+
+        return self.layers[self.hidden_layers](x)
+
+
+class AnycostSiren(Siren):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_dim: int,
+        out_features: int,
+        encoding: GridEmbedding,
+        outermost_linear: bool = False,
+        first_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=True
+        ),
+        hidden_layer_init: SirenInitializer = SirenUniformInitializer(
+            omega=30.0, is_first=False
+        ),
+        grad_parameters: Optional[GradientParameters] = None,
+    ):
+        assert encoding is not None
+        super().__init__(
+            in_features,
+            hidden_dim,
+            encoding.num_levels,
+            out_features,
+            outermost_linear,
+            first_layer_init,
+            hidden_layer_init,
+            grad_parameters,
+        )
+        self.encoding = encoding
+
+
+        projection_layers =[]
+        output_layers = []
+        for _ in range(self.hidden_layers):
+            projection_layer = nn.Linear(self.encoding.features_per_level, hidden_dim, bias=True)
+            nn.init.zeros_(projection_layer.bias)
+            projection_layers.append(projection_layer)
+
+            output_layer = SirenLayer(
+            hidden_dim, out_features, add_bias=True, disable_activation=outermost_linear
+            )
+            nn.init.zeros_(output_layer.bias)
+            output_layers.append(output_layer)
+
+        self.projection_layers = nn.ModuleList(projection_layers)
+        self.output_layers = nn.ModuleList(output_layers)
+
+
+    def forward(self, points: torch.Tensor) -> torch.Tensor:
+        x = points
+        # Get the features at the points
+        features = self.encoding(points)
+        features_per_level = self.encoding.features_per_level
+        
+        y = None
+        for i in range(self.hidden_layers):
+            projection_layer = self.projection_layers[i]
+            layer = self.layers[i]
+            output_layer = self.output_layers[i]
+            x = layer.forward(x, shift=projection_layer(features[:, i * features_per_level:(i + 1) * features_per_level]))
+            y = output_layer(x) if y is None else y + output_layer(x)
+
+        return y
 
 
 class ComplexSiren(Siren):
@@ -67,6 +191,7 @@ class ComplexSiren(Siren):
         hidden_layer_init: SirenInitializer = SirenUniformInitializer(
             omega=30.0, is_first=False
         ),
+        grad_parameters: Optional[GradientParameters] = None,
     ):
         super().__init__(
             in_features,
@@ -76,6 +201,7 @@ class ComplexSiren(Siren):
             outermost_linear,
             first_layer_init,
             hidden_layer_init,
+            grad_parameters,
         )
 
         first_layer = ComplexExpLayer(

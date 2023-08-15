@@ -6,7 +6,6 @@ from torch.nn import functional as F
 import numpy as np
 import cv2
 
-
 def convert_spherical_to_cartesian(
     shperical_coordinates: Tensor,
     degrees: bool = True,
