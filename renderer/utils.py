@@ -2,82 +2,9 @@ import math
 from typing import Optional
 import torch
 from torch import Tensor
-from torch.nn.functional import pad
 from torch.nn import functional as F
-
-
-def convert_points_from_homogeneous(points: Tensor, eps: float = 1e-8) -> Tensor:
-    r"""Function that converts points from homogeneous to Euclidean space.
-
-    Args:
-        points: the points to be transformed of shape :math:`(B, N, D)`.
-        eps: to avoid division by zero.
-
-    Returns:
-        the points in Euclidean space :math:`(B, N, D-1)`.
-
-    Examples:
-        >>> input = tensor([[0., 0., 1.]])
-        >>> convert_points_from_homogeneous(input)
-        tensor([[0., 0.]])
-    """
-    if not isinstance(points, Tensor):
-        raise TypeError(f"Input type is not a Tensor. Got {type(points)}")
-
-    if len(points.shape) < 2:
-        raise ValueError(f"Input must be at least a 2D tensor. Got {points.shape}")
-
-    # we check for points at max_val
-    z_vec: Tensor = points[..., -1:]
-
-    # set the results of division by zeror/near-zero to 1.0
-    # follow the convention of opencv:
-    # https://github.com/opencv/opencv/pull/14411/files
-    mask: Tensor = torch.abs(z_vec) > eps
-    scale = torch.where(mask, 1.0 / (z_vec + eps), torch.ones_like(z_vec))
-
-    return scale * points[..., :-1]
-
-
-def convert_points_to_homogeneous(points: Tensor) -> Tensor:
-    r"""Function that converts points from Euclidean to homogeneous space.
-
-    Args:
-        points: the points to be transformed with shape :math:`(*, N, D)`.
-
-    Returns:
-        the points in homogeneous coordinates :math:`(*, N, D+1)`.
-
-    Examples:
-        >>> input = tensor([[0., 0.]])
-        >>> convert_points_to_homogeneous(input)
-        tensor([[0., 0., 1.]])
-    """
-    if not isinstance(points, Tensor):
-        raise TypeError(f"Input type is not a Tensor. Got {type(points)}")
-    if len(points.shape) < 2:
-        raise ValueError(f"Input must be at least a 2D tensor. Got {points.shape}")
-
-    return pad(points, [0, 1], "constant", 1.0)
-
-
-def get_extrinsic_matrix_from_rotation_and_camera_position(
-                                                rotation: Tensor,
-                                                camera_position: Tensor,
-                                                ) -> torch.Tensor:
-    assert rotation.shape[0] == camera_position.shape[0]
-
-    assert rotation.dim() == 3
-    assert rotation.shape[1] == 3
-    assert rotation.shape[2] == 3
-
-    assert camera_position.dim() == 2
-    assert camera_position.shape[1] == 3
-
-    translations = -torch.bmm(rotation, camera_position.unsqueeze(-1)) # (B, 3, 1)
-    rotation_translation_matrix = torch.cat([rotation, translations], dim=-1)
-    extrinsic_matrix = torch.cat([rotation_translation_matrix, torch.tensor([[[0, 0, 0, 1]]], device=rotation.device).repeat(rotation.shape[0], 1, 1)], dim=1)
-    return extrinsic_matrix
+import numpy as np
+import cv2
 
 def convert_spherical_to_cartesian(
     shperical_coordinates: Tensor,
@@ -160,3 +87,37 @@ def look_at_rotation(
     R = torch.cat((x_axis[:, None, :], y_axis[:, None, :], z_axis[:, None, :]), dim=1)
     return R.transpose(1, 2)
 
+def silly_rasterizer(vertices_screen: np.ndarray, z_values: np.ndarray, faces: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Rasterizes a mesh using the vertices and faces.
+
+    Args:
+        vertices_screen (np.ndarray): Vertices in screen space.
+        z_values (np.ndarray): Z values of the vertices.
+        faces (np.ndarray): Faces of the mesh.
+        width (int): Width of the image.
+        height (int): Height of the image.
+        channels (int, optional): Number of channels. Defaults to 1.
+
+    Returns:
+        np.ndarray: Rasterized mesh.
+    """    
+    assert vertices_screen.shape[0] == z_values.shape[0]
+    assert vertices_screen.shape[1] == 2
+    assert vertices_screen.shape[2] == 3
+    assert faces.shape[1] == 3
+    assert faces.shape[0] == z_values.shape[0]
+
+    z_values /= z_values.max()
+    z_order = np.argsort([(z_values[i] + z_values[j] + z_values[k]) / -3 for i,j,k in np.asarray(faces)])
+
+    image = np.zeros((height, width, 3), dtype=np.uint32)
+
+    for face in faces[z_order]:
+        v0, v1, v2 = vertices_screen[face]
+        z0, z1, z2 = z_values[face]
+        avg_z = (z0 + z1 + z2) / 3
+        color = np.asarray([255 * (1 - avg_z)] * 3, dtype=np.uint32)∏
+
+        cv2.fillConvexPoly(image, np.int32([v0, v1, v2]), color)
+
+    return image
