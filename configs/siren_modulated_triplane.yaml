@@ -1,0 +1,294 @@
+# Set to an int to run seed_everything with this value before classes instantiation (type: Union[int, null], default: 42)
+seed_everything: 42
+
+# optimizer:
+#   class_path: torch.optim.RAdam
+#   init_args:
+#     lr: 0.00014
+#     # amsgrad: false
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 0.0001
+    weight_decay: 0.01
+    # amsgrad: true
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.ExponentialLR
+  init_args:
+    gamma: 0.98
+
+# <class 'training.sdf_experiment.Cloud2SdfExperiment'>
+model:
+  #   (required, type: <class 'Siren'>, known subclasses: models.siren.Siren)
+  sdf_model:
+    class_path: models.siren.ModulatedSiren
+    init_args: 
+      in_features: 3
+      hidden_dim: 128
+      hidden_layers: 4
+      out_features: 1
+      outermost_linear: true
+      first_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 90.0
+          is_first: true
+      hidden_layer_init:
+        class_path: layers.initializers.SirenUniformInitializer
+        init_args:
+          omega: 90.0
+      encoding:
+        class_path: layers.encodings.TriplaneEncoding
+        init_args:
+          resolution: 256
+          out_features: 64
+          mask_k_levels: 6
+          reduce: sum
+      grad_parameters:
+        class_path: models.sdf.GradientParameters
+        init_args: 
+          computation_type: ANALYTICAL
+          delta: 0.02
+
+  level_set_loss: 
+    class_path: losses.SurfaceLoss
+    init_args: 
+      weight: 100.0
+
+  eikonal_loss:
+    class_path: losses.EikonalLoss
+    init_args: 
+      weight: 2.0
+      type: l2
+
+  grad_direction_loss:
+    class_path: losses.GradientDirectionLoss
+    init_args: 
+      weight: 3.0
+      type: monosdf
+
+  offsurface_gt_loss:
+    class_path: losses.OffSurfaceGTLoss
+    init_args: 
+      weight: 30.0
+
+  offsurface_loss:
+    class_path: losses.MarginLoss
+    init_args: 
+      weight: 30.0
+      margin: 0.005
+    # class_path: losses.CoareaLoss
+    # init_args: 
+    #   weight: 3e-2
+    #   beta: 0.005
+
+  laplacian_loss:
+    class_path: losses.LaplacianLoss
+    init_args: 
+      weight: 0.1
+  
+# <class 'training.mesh_data_module.SdfDataModule'>
+data:
+
+  #   (required, type: <class 'MeshDataset'>, known subclasses: training.dataset.MeshDataset)
+  dataset:
+    class_path: training.dataset.MeshDataset
+    init_args: 
+      model_path: data/frazer-nash-super-sport-1929.obj
+      number_of_samples: 10240000
+      add_vertices: true
+  batch_size: 40000
+
+
+
+# Path/URL of the checkpoint from which training is resumed. If there is
+# no checkpoint file at the path, an exception is raised. If resuming from mid-epoch checkpoint,
+# training will start from the beginning of the next epoch. (type: Optional[str], default: null)
+ckpt_path:
+
+
+# Customize every aspect of training via flags
+trainer:
+  default_root_dir:
+  logger: 
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: logs
+      name: siren-triplane
+  enable_checkpointing: true
+
+
+  # Add a callback or list of callbacks.
+  # Default: ``None``. (type: Union[List[Callback], Callback, null], default: null, known subclasses: pytorch_lightning.Callback, pytorch_lightning.callbacks.Checkpoint, pytorch_lightning.callbacks.ModelCheckpoint, pytorch_lightning.callbacks.DeviceStatsMonitor, pytorch_lightning.callbacks.EarlyStopping, pytorch_lightning.callbacks.BaseFinetuning, pytorch_lightning.callbacks.BackboneFinetuning, pytorch_lightning.callbacks.GradientAccumulationScheduler, pytorch_lightning.callbacks.LambdaCallback, pytorch_lightning.callbacks.LearningRateMonitor, pytorch_lightning.callbacks.ModelSummary, pytorch_lightning.callbacks.RichModelSummary, pytorch_lightning.callbacks.BasePredictionWriter, pytorch_lightning.callbacks.ProgressBarBase, pytorch_lightning.callbacks.RichProgressBar, pytorch_lightning.callbacks.TQDMProgressBar, pytorch_lightning.callbacks.Timer, pytorch_lightning.callbacks.ModelPruning, pytorch_lightning.callbacks.QuantizationAwareTraining, pytorch_lightning.callbacks.StochasticWeightAveraging, pytorch_lightning.cli.SaveConfigCallback, pytorch_lightning.utilities.cli.SaveConfigCallback, __main__.RenderingCalback)
+  callbacks: 
+    - callbacks.RenderingCalback
+    # - callbacks.ActivationDistributionCalback
+    - callbacks.ResampleCallback
+    # - pytorch_lightning.callbacks.StochasticWeightAveraging
+    - pytorch_lightning.callbacks.LearningRateMonitor
+    # - callbacks.SirenFrequencyCalback
+    - class_path: callbacks.GradDeltaScheduler
+      init_args:
+        min_resolution: 64
+        max_resolution: 512
+        steps_per_level: 1024
+        swith_to_analytical_after_max: true
+    # - class_path: callbacks.CurvatureLossScheduler
+    #   init_args:
+    #     warmup_steps: 512
+    #     decay_steps: 2048
+    - class_path: callbacks.MaskLevelsCallback
+      init_args:
+        steps_per_level: 1024
+
+  # The value at which to clip gradients. Passing ``gradient_clip_val=None`` disables
+  # gradient clipping. If using Automatic Mixed Precision (AMP), the gradients will be unscaled before.
+  # Default: ``None``. (type: Union[int, float, null], default: null)
+  gradient_clip_val:
+
+  # The gradient clipping algorithm to use. Pass ``gradient_clip_algorithm="value"``
+  # to clip by value, and ``gradient_clip_algorithm="norm"`` to clip by norm. By default it will
+  # be set to ``"norm"``. (type: Optional[str], default: null)
+  gradient_clip_algorithm:
+
+  # Number of GPU nodes for distributed training.
+  # Default: ``1``. (type: int, default: 1)
+  num_nodes: 1
+
+  # Will be mapped to either `gpus`, `tpu_cores`, `num_processes` or `ipus`,
+  # based on the accelerator type. (type: Union[List[int], str, int, null], default: null)
+  devices: 1
+
+
+  # Whether to enable to progress bar by default.
+  # Default: ``True``. (type: bool, default: True)
+  enable_progress_bar: true
+
+  # Overfit a fraction of training/validation data (float) or a set number of batches (int).
+  # Default: ``0.0``. (type: Union[int, float], default: 0.0)
+  overfit_batches: 0.0
+
+
+  # Perform a validation loop every after every `N` training epochs. If ``None``,
+  # validation will be done solely based on the number of training batches, requiring ``val_check_interval``
+  # to be an integer value.
+  # Default: ``1``. (type: Optional[int], default: 1)
+  check_val_every_n_epoch: 1
+
+  # Runs n if set to ``n`` (int) else 1 if set to ``True`` batch(es)
+  # of train, val and test to find any bugs (ie: a sort of unit test).
+  # Default: ``False``. (type: Union[int, bool], default: False)
+  fast_dev_run: false
+
+  # Accumulates grads every k batches or as set up in the dict.
+  # Default: ``None``. (type: Union[int, Dict[int, int], null], default: null)
+  accumulate_grad_batches: 1
+
+  # Stop training once this number of epochs is reached. Disabled by default (None).
+  # If both max_epochs and max_steps are not specified, defaults to ``max_epochs = 1000``.
+  # To enable infinite training, set ``max_epochs = -1``. (type: Optional[int], default: null)
+  max_epochs: 256
+
+  # Force training for at least these many epochs. Disabled by default (None). (type: Optional[int], default: null)
+  min_epochs:
+
+  # Stop training after this number of steps. Disabled by default (-1). If ``max_steps = -1``
+  # and ``max_epochs = None``, will default to ``max_epochs = 1000``. To enable infinite training, set
+  # ``max_epochs`` to ``-1``. (type: int, default: -1)
+  max_steps: -1
+
+  # Force training for at least these number of steps. Disabled by default (``None``). (type: Optional[int], default: null)
+  min_steps:
+
+  # Stop training after this amount of time has passed. Disabled by default (``None``).
+  # The time duration can be specified in the format DD:HH:MM:SS (days, hours, minutes seconds), as a
+  # :class:`datetime.timedelta`, or a dictionary with keys that will be passed to
+  # :class:`datetime.timedelta`. (type: Union[str, timedelta, Dict[str, int], null], default: null)
+  max_time:
+
+  # How much of training dataset to check (float = fraction, int = num_batches).
+  # Default: ``1.0``. (type: Union[int, float, null], default: null)
+  limit_train_batches:
+
+  # How much of validation dataset to check (float = fraction, int = num_batches).
+  # Default: ``1.0``. (type: Union[int, float, null], default: null)
+  limit_val_batches:
+
+  # How much of test dataset to check (float = fraction, int = num_batches).
+  # Default: ``1.0``. (type: Union[int, float, null], default: null)
+  limit_test_batches:
+
+  # How much of prediction dataset to check (float = fraction, int = num_batches).
+  # Default: ``1.0``. (type: Union[int, float, null], default: null)
+  limit_predict_batches:
+
+  # How often to check the validation set. Pass a ``float`` in the range [0.0, 1.0] to check
+  # after a fraction of the training epoch. Pass an ``int`` to check after a fixed number of training
+  # batches. An ``int`` value can only be higher than the number of training batches when
+  # ``check_val_every_n_epoch=None``, which validates after every ``N`` training batches
+  # across epochs or during iteration-based training.
+  # Default: ``1.0``. (type: Union[int, float, null], default: null)
+  val_check_interval:
+
+  # How often to log within steps.
+  # Default: ``50``. (type: int, default: 50)
+  log_every_n_steps: 50
+
+  # Supports passing different accelerator types ("cpu", "gpu", "tpu", "ipu", "hpu", "mps, "auto")
+  # as well as custom accelerator instances.
+
+  # .. deprecated:: v1.5
+  #     Passing training strategies (e.g., 'ddp') to ``accelerator`` has been deprecated in v1.5.0
+  #     and will be removed in v1.7.0. Please use the ``strategy`` argument instead. (type: Union[str, Accelerator, null], default: null, known subclasses: pytorch_lightning.accelerators.CUDAAccelerator, pytorch_lightning.accelerators.GPUAccelerator, pytorch_lightning.accelerators.IPUAccelerator, pytorch_lightning.accelerators.CPUAccelerator, pytorch_lightning.accelerators.HPUAccelerator, pytorch_lightning.accelerators.MPSAccelerator, pytorch_lightning.accelerators.TPUAccelerator)
+  accelerator: gpu
+
+  # Supports different training strategies with aliases
+  # as well custom strategies.
+  # Default: ``None``. (type: Union[str, Strategy, null], default: null, known subclasses: pytorch_lightning.strategies.DDPStrategy, pytorch_lightning.strategies.BaguaStrategy, pytorch_lightning.strategies.DeepSpeedStrategy, pytorch_lightning.plugins.DeepSpeedPlugin, pytorch_lightning.strategies.DDPFullyShardedStrategy, pytorch_lightning.plugins.DDPFullyShardedPlugin, pytorch_lightning.strategies.HPUParallelStrategy, pytorch_lightning.strategies.DDPShardedStrategy, pytorch_lightning.plugins.DDPShardedPlugin, pytorch_lightning.plugins.DDPPlugin, pytorch_lightning.strategies.DDPSpawnStrategy, pytorch_lightning.strategies.DDPSpawnShardedStrategy, pytorch_lightning.plugins.DDPSpawnShardedPlugin, pytorch_lightning.strategies.TPUSpawnStrategy, pytorch_lightning.plugins.TPUSpawnPlugin, pytorch_lightning.plugins.DDPSpawnPlugin, pytorch_lightning.strategies.DataParallelStrategy, pytorch_lightning.plugins.DataParallelPlugin, pytorch_lightning.strategies.DDPFullyShardedNativeStrategy, pytorch_lightning.strategies.HorovodStrategy, pytorch_lightning.plugins.HorovodPlugin, pytorch_lightning.strategies.IPUStrategy, pytorch_lightning.plugins.IPUPlugin, pytorch_lightning.strategies.HivemindStrategy, pytorch_lightning.strategies.SingleDeviceStrategy, pytorch_lightning.strategies.SingleHPUStrategy, pytorch_lightning.strategies.SingleTPUStrategy, pytorch_lightning.plugins.SingleTPUPlugin, pytorch_lightning.plugins.SingleDevicePlugin)
+  strategy: auto
+
+  # Synchronize batch norm layers between process groups/whole world.
+  # Default: ``False``. (type: bool, default: False)
+  sync_batchnorm: false
+
+  # Double precision (64), full precision (32), half precision (16) or bfloat16 precision (bf16).
+  # Can be used on CPU, GPU, TPUs, HPUs or IPUs.
+  # Default: ``32``. (type: Union[int, str], default: 32)
+  precision: bf16-mixed
+
+  # Whether to enable model summarization by default.
+  # Default: ``True``. (type: bool, default: True)
+  enable_model_summary: true
+
+  # Sanity check runs n validation batches before starting the training routine.
+  # Set it to `-1` to run all batches in all validation dataloaders.
+  # Default: ``2``. (type: int, default: 2)
+  num_sanity_val_steps: 2
+
+
+  # To profile individual steps during training and assist in identifying bottlenecks.
+  # Default: ``None``. (type: Union[Profiler, str, null], default: null, known subclasses: pytorch_lightning.profilers.AdvancedProfiler, pytorch_lightning.profilers.PassThroughProfiler, pytorch_lightning.profilers.PyTorchProfiler, pytorch_lightning.profilers.SimpleProfiler, pytorch_lightning.profilers.XLAProfiler)
+  profiler:
+
+  # The value (``True`` or ``False``) to set ``torch.backends.cudnn.benchmark`` to.
+  # The value for ``torch.backends.cudnn.benchmark`` set in the current session will be used
+  # (``False`` if not manually set). If :paramref:`~pytorch_lightning.trainer.Trainer.deterministic` is set
+  # to ``True``, this will default to ``False``. Override to manually set a different value.
+  # Default: ``None``. (type: Optional[bool], default: null)
+  benchmark:
+
+  # If ``True``, sets whether PyTorch operations must use deterministic algorithms.
+  # Set to ``"warn"`` to use deterministic algorithms whenever possible, throwing warnings on operations
+  # that don't support deterministic mode (requires PyTorch 1.11+). If not set, defaults to ``False``.
+  # Default: ``None``. (type: Union[bool, Literal['warn'], null], default: null)
+  deterministic:
+
+  # Set to a non-negative integer to reload dataloaders every n epochs.
+  # Default: ``0``. (type: int, default: 0)
+  reload_dataloaders_every_n_epochs: 0
+
+
+  # Enable anomaly detection for the autograd engine.
+  # Default: ``False``. (type: bool, default: False)
+  detect_anomaly: false
+
