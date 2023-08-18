@@ -116,7 +116,7 @@ def silly_rasterizer(vertices_screen: np.ndarray, z_values: np.ndarray, faces: n
         v0, v1, v2 = vertices_screen[face]
         z0, z1, z2 = z_values[face]
         avg_z = (z0 + z1 + z2) / 3
-        color = np.asarray([255 * (1 - avg_z)] * 3, dtype=np.uint32)∏
+        color = np.asarray([255 * (1 - avg_z)] * 3, dtype=np.uint32)
 
         cv2.fillConvexPoly(image, np.int32([v0, v1, v2]), color)
 

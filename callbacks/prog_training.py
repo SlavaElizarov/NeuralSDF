@@ -1,8 +1,9 @@
 
-from training.sdf_experiment import Cloud2SdfExperiment
-from models.sdf import GradComputationType
-from layers.encodings import GridEmbedding
 import pytorch_lightning as pl
+
+from layers.encodings import Encoding
+from models.sdf import GradComputationType
+from training.sdf_experiment import Cloud2SdfExperiment
 
 
 class CurvatureLossScheduler(pl.Callback):
@@ -43,12 +44,12 @@ class MaskLevelsCallback(pl.Callback):
         if self._encoding is None:
             assert hasattr(experiment.sdf_model, self.encodimg_field_name)
             encoding = getattr(experiment.sdf_model, self.encodimg_field_name)
-            assert isinstance(encoding, GridEmbedding)
+            assert isinstance(encoding, Encoding)
             self._encoding = encoding
 
         if self._encoding.mask_k_levels > 0 and trainer.global_step > 0 and \
            trainer.global_step % self.steps_per_level == 0:
-            self._encoding.mask_k_levels -= 1
+            self._encoding.set_mask_k_levels(self._encoding.mask_k_levels - 1)
             print(f"Unmasking level {self._encoding.mask_k_levels}")
 
 

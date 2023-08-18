@@ -1,9 +1,19 @@
+from typing import Literal
 import tinycudann as tcnn
 from torch import nn
 import torch
+import torch.nn.functional as F
 
 
-class GridEmbedding(nn.Module):
+class Encoding(nn.Module):
+    in_features: int
+    out_features: int
+
+    def __init__(self):
+        super().__init__()
+
+
+class GridEmbedding(Encoding):
     def __init__(self,
                  in_features: int,
                  num_levels: int = 16,
@@ -62,3 +72,84 @@ class GridEmbedding(nn.Module):
             features = features * mask
 
         return features
+
+
+class TriplaneEncoding(Encoding):
+    def __init__(
+        self,
+        resolution: int = 32,
+        out_features: int = 64,
+        init_scale: float = 0.1,
+        reduce: Literal["sum", "product", "concat"] = "sum",
+        mask_k_levels: int = 0,
+    ) -> None:
+        super().__init__()
+        self.in_features = 3
+        self.out_features = out_features * 3 if reduce == "concat" else out_features
+        self.resolution = resolution
+        self.init_scale = init_scale
+        self.reduce = reduce
+        self.mask_k_levels = mask_k_levels
+
+        # init_values = self.init_scale * torch.randn((3,
+        #                                out_features,
+        #                                self.resolution, self.resolution))
+
+        self.planes = nn.Parameter(torch.empty((3,
+                                   out_features,
+                                   self.resolution, self.resolution)))
+        nn.init.xavier_uniform_(self.planes, gain=1.0)
+
+    def forward(self, points: torch.Tensor) -> torch.Tensor:
+        assert points.shape[-1] == 3
+
+        original_shape = points.shape
+        points = points.view(-1, 3) / 1.2
+
+        plane_coord = torch.stack(
+            [points[..., [0, 1]], points[..., [0, 2]], points[..., [1, 2]]], dim=0)
+
+        # TODO: should I?
+        # Stop gradients from going to sampler
+        plane_coord = plane_coord.detach().view(3, -1, 1, 2)
+
+        planes = self.planes
+        if self.mask_k_levels > 0:
+            factor = 2 ** self.mask_k_levels
+            planes = planes.view(
+                3, -1, factor, self.resolution // factor, factor, self.resolution // factor)
+            planes = torch.mean(planes, dim=(2, 4))
+
+        plane_features = F.grid_sample(
+            planes, plane_coord, align_corners=True
+        )  # [3, num_components, flattened_bs, 1]
+
+        if self.reduce == "product":
+            plane_features = plane_features.prod(
+                0).squeeze(-1).T  # [flattened_bs, num_components]
+        elif self.reduce == "sum":
+            plane_features = plane_features.sum(0).squeeze(-1).T
+        elif self.reduce == "concat":
+            plane_features = plane_features.permute(2, 0, 1, 3)
+
+        else:
+            raise ValueError(f"Unknown reduce method {self.reduce}")
+
+        return plane_features.reshape(*original_shape[:-1], self.out_features)
+
+    def set_mask_k_levels(self, mask_k_levels: int):
+        self.mask_k_levels = mask_k_levels
+
+    @torch.no_grad()
+    def upsample_grid(self, resolution: int) -> None:
+        """Upsamples underlying feature grid
+
+        Args:
+            resolution: Target resolution.
+        """
+        planes = F.interpolate(
+            self.planes.data, size=(resolution, resolution), mode="bilinear", align_corners=True
+        )
+
+        self.planes = torch.nn.Parameter(planes)
+        self.resolution = resolution

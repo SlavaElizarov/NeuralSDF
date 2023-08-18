@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 from layers import ComplexExpLayer, SirenLayer
-from layers.encodings import GridEmbedding
+from layers.encodings import Encoding, GridEmbedding
 from layers.initializers import SirenInitializer, SirenUniformInitializer
 from models.sdf import SDF, GradientParameters
 
@@ -69,7 +69,7 @@ class ModulatedSiren(Siren):
         hidden_dim: int,
         hidden_layers: int,
         out_features: int,
-        encoding: GridEmbedding,
+        encoding: Encoding,
         outermost_linear: bool = False,
         first_layer_init: SirenInitializer = SirenUniformInitializer(
             omega=30.0, is_first=True
