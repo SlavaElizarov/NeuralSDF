@@ -79,7 +79,6 @@ class TriplaneEncoding(Encoding):
         self,
         resolution: int = 32,
         out_features: int = 64,
-        init_scale: float = 0.1,
         reduce: Literal["sum", "product", "concat"] = "sum",
         mask_k_levels: int = 0,
     ) -> None:
@@ -87,13 +86,9 @@ class TriplaneEncoding(Encoding):
         self.in_features = 3
         self.out_features = out_features * 3 if reduce == "concat" else out_features
         self.resolution = resolution
-        self.init_scale = init_scale
         self.reduce = reduce
         self.mask_k_levels = mask_k_levels
 
-        # init_values = self.init_scale * torch.randn((3,
-        #                                out_features,
-        #                                self.resolution, self.resolution))
 
         self.planes = nn.Parameter(torch.empty((3,
                                    out_features,
