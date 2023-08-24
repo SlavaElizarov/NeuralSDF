@@ -87,37 +87,3 @@ def look_at_rotation(
     R = torch.cat((x_axis[:, None, :], y_axis[:, None, :], z_axis[:, None, :]), dim=1)
     return R.transpose(1, 2)
 
-def silly_rasterizer(vertices_screen: np.ndarray, z_values: np.ndarray, faces: np.ndarray, width: int, height: int) -> np.ndarray:
-    """Rasterizes a mesh using the vertices and faces.
-
-    Args:
-        vertices_screen (np.ndarray): Vertices in screen space.
-        z_values (np.ndarray): Z values of the vertices.
-        faces (np.ndarray): Faces of the mesh.
-        width (int): Width of the image.
-        height (int): Height of the image.
-        channels (int, optional): Number of channels. Defaults to 1.
-
-    Returns:
-        np.ndarray: Rasterized mesh.
-    """    
-    assert vertices_screen.shape[0] == z_values.shape[0]
-    assert vertices_screen.shape[1] == 2
-    assert vertices_screen.shape[2] == 3
-    assert faces.shape[1] == 3
-    assert faces.shape[0] == z_values.shape[0]
-
-    z_values /= z_values.max()
-    z_order = np.argsort([(z_values[i] + z_values[j] + z_values[k]) / -3 for i,j,k in np.asarray(faces)])
-
-    image = np.zeros((height, width, 3), dtype=np.uint32)
-
-    for face in faces[z_order]:
-        v0, v1, v2 = vertices_screen[face]
-        z0, z1, z2 = z_values[face]
-        avg_z = (z0 + z1 + z2) / 3
-        color = np.asarray([255 * (1 - avg_z)] * 3, dtype=np.uint32)
-
-        cv2.fillConvexPoly(image, np.int32([v0, v1, v2]), color)
-
-    return image

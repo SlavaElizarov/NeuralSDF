@@ -46,7 +46,7 @@ class RenderingCalback(pl.Callback):
             frame_back = self.render(sdf_model, dist=1.3, elev=90, azim=180, device=device, max_iteration=40, dtype=dtype)  # type: ignore
             frame_side = self.render(sdf_model, dist=1.3, elev=90, azim=90, device=device, max_iteration=40, dtype=dtype)  # type: ignore
             frame_top = self.render(sdf_model, dist=1.3, elev=1, azim=0, device=device, max_iteration=40, dtype=dtype)  # type: ignore
-
+    
             tensorboard: SummaryWriter = trainer.logger.experiment  # type: ignore
 
             col1 = torch.cat([frame_front, frame_back], dim=0)

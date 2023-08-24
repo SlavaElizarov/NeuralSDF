@@ -48,6 +48,38 @@ class Cameras(nn.Module):
         self.width = width
         self.device = device
 
+    @classmethod
+    def from_calibration_matrix(cls,
+                                calibration_matrix: Tensor,
+                                rotation: Tensor,
+                                camera_position: Tensor,
+                                requires_grad: bool = False,
+                                device="cpu") -> "Cameras":
+        """
+        Alternative constructor which creates a camera from a calibration matrix.
+
+        Args:
+            calibration_matrix (Tensor): calibration matrices of shape (B, 3, 3).
+            rotation (Tensor): camera rotation matrices in world space of shape (B, 3, 3).
+            camera_position (Tensor): camera positions in world space of shape (B, 3).
+            requires_grad (bool, optional): requires_grad. Defaults to False.
+            device (str, optional): device. Defaults to "cpu".
+
+        Returns:
+            Cameras: camera object.
+        """   
+
+        assert calibration_matrix.dim() == 3
+        assert calibration_matrix.shape[-2:] == (3, 3)
+
+        width = calibration_matrix[..., 0, 2] * 2 + 1
+        height = calibration_matrix[..., 1, 2] * 2 + 1
+        focal_length = calibration_matrix[..., 0, 0] / width * 2
+        focal_length_2 = calibration_matrix[..., 1, 1] / height * 2
+        assert torch.isclose(focal_length, focal_length_2).all()
+
+        return cls(rotation, camera_position, focal_length, height, width, requires_grad, device)
+      
     def get_calibration_matrices(self) -> Tensor:
         r"""Return the calibration matrices of the storage.
 
@@ -71,50 +103,8 @@ class Cameras(nn.Module):
         """
         return self.rotation.shape[0]
 
-    
-    def forward(self, points: Tensor, camera_indices: Tensor) -> Tensor:
-        """Transforms points from world space to screen space.
 
-        Args:
-            points (Tensor): tensor of shape (N, 3) containing points in world space.
-            camera_indices (Tensor): tensor of shape (N) containing the camera indices for each point.
-
-        Returns:
-            Tensor: tensor of shape (N, 2) containing points in screen space.
-        """        
-        assert points.dim() == 3
-        assert points.shape[-1] == 3
-        assert camera_indices.dim() == 1
-        assert camera_indices.shape[0] == points.shape[0]
-
-        projection = self.projection[camera_indices].unsqueeze(1) # Bx1x4x4
-
-        # to homogeneous
-        points_h = convert_points_to_homogeneous(points)  # BxNx4
-        # transform coordinates
-        points_0_h = torch.matmul(points_h, projection.permute(0, 2, 1)) # BxNx4
-        # points_0_h = torch.bmm(points_h, projection.permute(0, 2, 1))
-        points_0_h = torch.squeeze(points_0_h, dim=-1)
-        # to euclidean
-        return convert_points_from_homogeneous(points_0_h)  # BxNx3
-    
-    
-    def emit_rays(self,
-                  camera_indices: Optional[Tensor] = None,
-                  rays_per_pixel: int = 1,
-                  uv: Optional[Tensor] = None) -> Tensor:
-        """Emit rays from camera origin to screen space for ray/sphere tracing and NERFs.
-
-        Args:
-            camera_indices (Tensor): tensor of shape (N) containing the camera indices for each point. (B)
-            coords (Optional[Tensor], optional): UV coordinates of ray origins. Defaults to None. (B, N, 2)
-
-        Returns:
-            Tensor: tensor of shape (N, 3) containing ray directions.
-        """
-        return self.rotation.shape[0]
-
-    def forward(self, points: Tensor, camera_indices: Tensor) -> Tensor:
+    def forward(self, points: Tensor, camera_indices: Tensor, normalize_uv: bool = False) -> Tensor:
         """Transforms points from world space to screen space.
 
         Args:
@@ -129,8 +119,7 @@ class Cameras(nn.Module):
         assert camera_indices.shape[0] == points.shape[0]
 
         rotation = self.rotation[camera_indices]  # Bx3x3
-        camera_position = self.camera_position[camera_indices].unsqueeze(
-            1)  # Bx1x3
+        camera_position = self.camera_position[camera_indices].unsqueeze(1)  # Bx1x3
 
         # to camera space
         points = points - camera_position  # BxNx3
@@ -143,6 +132,10 @@ class Cameras(nn.Module):
 
         # flip v axis
         uv[..., 1] = self.height - uv[..., 1]
+
+        if normalize_uv:
+            uv[..., 0] = uv[..., 0] / self.width * 2 - 1
+            uv[..., 1] = uv[..., 1] / self.height * 2 - 1
 
         return uv, points[..., -1]
 

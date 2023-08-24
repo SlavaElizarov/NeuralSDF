@@ -63,6 +63,6 @@ class SphereTracingRenderer:
             color = torch.einsum('ik,ik->i', normals, -directions[is_hit].view(-1, 3)).to(frame.dtype)
             
             frame[is_hit] = torch.stack([color]*3, dim=-1)
-            frame = frame.reshape(self.camera.height, self.camera.width, 3)
+        frame = frame.reshape(self.camera.height, self.camera.width, 3)
         return frame
 
